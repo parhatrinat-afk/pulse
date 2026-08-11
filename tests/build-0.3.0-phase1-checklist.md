@@ -45,3 +45,18 @@ Run after applying `office-scripts/Build_0_3_0_Phase1.ts` to the validated
 - [ ] Run the Office Script in Excel for the web and save a separate Phase 1 checkpoint.
 - [ ] Visually inspect Mapping, Reporting Groups, Effective Mapping, and Mapping QA.
 - [ ] Exercise an Apply action on a copy, then remap its parent and confirm the exception remains.
+
+## Accepted live QA record — 2026-08-11
+
+- [x] Office Script executed successfully in Excel for the web.
+- [x] Dropdown validation reported ready for all six selectors.
+- [x] SourceMainCategory and SourceSubCategory inheritance/override behavior passed.
+- [x] Product-level explicit overrides passed.
+- [x] Lower-level explicit rules survived parent remapping.
+- [x] Overlapping explicit rules surfaced as conflicts rather than resolving silently.
+- [x] Deactivation surfaced inactive targets; reactivation restored mappings.
+- [x] All nine `Mapping QA` checks passed.
+- [x] Sales and quantity reconciliation passed.
+- [x] Fact row count remained 18,086.
+- [x] Conflict table was empty after cleanup.
+- [x] Performance remained on the intentionally deferred legacy category calculation layer.

@@ -41,3 +41,27 @@ recomputation.
 Map and Set collections are traversed with `forEach` callbacks. Iterator-based
 `for...of`, `entries`, and `Array.from` patterns are avoided for compatibility
 with the Office Scripts TypeScript compiler target.
+
+## Accepted live Excel QA — 2026-08-11
+
+Phase 1 passed live behavioral QA in Excel for the web. The accepted run
+confirmed:
+
+- the Office Script executed successfully and reported dropdown validation
+  ready for all six selectors;
+- SourceMainCategory inheritance, SourceSubCategory inheritance/overrides, and
+  Product-level explicit overrides resolved correctly;
+- lower-level explicit rules survived parent remapping;
+- overlapping explicit rules surfaced as conflicts rather than being silently
+  resolved;
+- rule deactivation surfaced inactive targets and reactivation restored the
+  mappings;
+- all nine `Mapping QA` checks passed, including sales and quantity
+  reconciliation;
+- the fact row count remained 18,086;
+- the conflict table was empty after test-rule cleanup; and
+- Performance remained on the legacy category calculation layer as required by
+  the Phase 1 boundary.
+
+This acceptance validates the Phase 1 mapping foundation only. It does not
+start or approve Phase 2 metric/Performance integration.
