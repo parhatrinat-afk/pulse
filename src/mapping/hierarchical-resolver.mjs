@@ -9,6 +9,10 @@ export const CURRENT_HIERARCHY = [
   { scopeType: "Product", level: 3 },
 ];
 
+export function normalizeRuleAction(rule) {
+  return String(rule.ruleAction ?? rule.action ?? "").trim() || "Map";
+}
+
 export function intervalsOverlap(a, b) {
   const aStart = a.effectiveFrom ?? Number.NEGATIVE_INFINITY;
   const bStart = b.effectiveFrom ?? Number.NEGATIVE_INFINITY;
@@ -69,6 +73,24 @@ export function resolveProduct({ product, rules, groups, asOf, hierarchy = CURRE
     }
     if (candidates.length === 1) {
       const rule = candidates[0];
+      const action = normalizeRuleAction(rule);
+      if (action !== "Map" && action !== "Exclude") {
+        throw new Error(`Rule ${rule.mappingRuleId} has unsupported action ${action}.`);
+      }
+      if (action === "Exclude" &&
+          (rule.scopeType !== "Product" ||
+           String(rule.targetReportingGroupId ?? rule.targetGroupId ?? "").trim())) {
+        throw new Error(`Rule ${rule.mappingRuleId} is not a valid Product exclusion.`);
+      }
+      if (action === "Exclude") {
+        return {
+          effectiveReportingGroupId: "",
+          resolutionSource: "Product",
+          resolutionState: "Explicit exclusion",
+          resolutionStatus: "Unmapped",
+          ruleId: rule.mappingRuleId,
+        };
+      }
       const group = groupById.get(rule.targetReportingGroupId);
       if (!group || group.active !== "Yes") {
         return {

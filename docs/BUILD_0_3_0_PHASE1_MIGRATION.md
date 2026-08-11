@@ -38,6 +38,13 @@ wired independently; a rejected nonessential validation is surfaced as
 `PUL-0301-013` on `Mapping` and in the script result without blocking mapping
 recomputation.
 
+The Lovable migration extension appends `RuleAction` to `tblMappingRules`.
+Blank values on pre-extension rules are normalized to `Map`. `Exclude` is
+supported only for a stable ProductID with a blank Reporting Group target and
+resolves as `Unmapped / Explicit exclusion`. The Mapping Rules surface now has
+a seventh dropdown validation for this field. Deactivation uses the existing
+rule-ID action and restores inherited resolution.
+
 Map and Set collections are traversed with `forEach` callbacks. Iterator-based
 `for...of`, `entries`, and `Array.from` patterns are avoided for compatibility
 with the Office Scripts TypeScript compiler target.

@@ -26,6 +26,12 @@ Subcategory → Source Main Category, but those are adapter-exposed levels rathe
 than a permanent three-level platform limit. Inheritance is computed and does
 not copy parent rules into descendant rows.
 
+Product-scoped explicit exclusions use the same Mapping Rule lineage and
+effective-date contract. They override inherited membership by resolving the
+stable ProductID to the existing Unmapped state; there is no synthetic
+“Unmapped” Reporting Group and excluded facts remain in all source totals and
+metric denominators.
+
 ## Phase 2A metric bridge
 
 Phase 2A joins immutable sales facts to the validated current Effective Mapping

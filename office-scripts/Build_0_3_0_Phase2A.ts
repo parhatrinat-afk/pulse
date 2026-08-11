@@ -159,7 +159,7 @@ function main(workbook: ExcelScript.Workbook): string {
 type ReportingGroup = { id: string; name: string; active: string; sortOrder: number };
 type MappingRule = {
   id: string; sourceSystemId: string; scopeType: string; nodeId: string;
-  targetGroupId: string; effectiveFrom: number; effectiveTo: number; status: string;
+  targetGroupId: string; ruleAction: string; effectiveFrom: number; effectiveTo: number; status: string;
 };
 type ProductNode = {
   productId: string; sourceSystemId: string; productName: string; salesAccount: string;
@@ -235,7 +235,7 @@ function readGroups(table: ExcelScript.Table): ReportingGroup[] {
 
 function readRules(table: ExcelScript.Table): MappingRule[] {
   const h = headerMap(table);
-  return table.getRangeBetweenHeaderAndTotal().getValues()
+  const rules = table.getRangeBetweenHeaderAndTotal().getValues()
     .filter(row => text(row[h.MappingRuleID]))
     .map(row => ({
       id: text(row[h.MappingRuleID]),
@@ -243,10 +243,25 @@ function readRules(table: ExcelScript.Table): MappingRule[] {
       scopeType: text(row[h.ScopeType]),
       nodeId: text(row[h.NodeID]),
       targetGroupId: text(row[h.TargetReportingGroupID]),
+      ruleAction: h.RuleAction === undefined ? "Map" : text(row[h.RuleAction]) || "Map",
       effectiveFrom: numberValue(row[h.EffectiveFrom]),
       effectiveTo: numberValue(row[h.EffectiveTo]),
       status: text(row[h.Status])
     }));
+  for (const rule of rules) validateRuleAction(rule);
+  return rules;
+}
+
+function validateRuleAction(rule: MappingRule): void {
+  if (rule.ruleAction !== "Map" && rule.ruleAction !== "Exclude") {
+    throw new Error(`PUL-0302A-023: Rule ${rule.id} has unsupported RuleAction ${rule.ruleAction}.`);
+  }
+  if (rule.ruleAction === "Exclude" && (rule.scopeType !== "Product" || !!rule.targetGroupId)) {
+    throw new Error(`PUL-0302A-024: Rule ${rule.id} must be a Product exclusion with a blank Reporting Group target.`);
+  }
+  if (rule.ruleAction === "Map" && !rule.targetGroupId) {
+    throw new Error(`PUL-0302A-025: Map rule ${rule.id} requires a Reporting Group target.`);
+  }
 }
 
 function buildHierarchy(classifications: ExcelScript.Table, products: ExcelScript.Table): ProductNode[] {
@@ -338,6 +353,17 @@ function resolveProduct(
     }
     if (candidates.length === 1) {
       const rule = candidates[0];
+      if (rule.ruleAction === "Exclude") {
+        return {
+          ...base,
+          effectiveGroupId: "",
+          effectiveGroupName: "",
+          resolutionSource: "Product",
+          resolutionState: "Explicit exclusion",
+          resolutionStatus: "Unmapped",
+          winningRuleId: rule.id
+        };
+      }
       const group = groupById.get(rule.targetGroupId);
       return {
         ...base,
@@ -428,10 +454,10 @@ function computeMappingFingerprint(
   products: ProductNode[],
   resolutions: Resolution[]
 ): string {
-  const records: string[] = [fingerprintRecord("V", ["PULSE-MAPPING-SEMANTIC-V1", asOfDate])];
+  const records: string[] = [fingerprintRecord("V", ["PULSE-MAPPING-SEMANTIC-V2", asOfDate])];
   for (const group of groups) records.push(fingerprintRecord("G", [group.id, group.name, group.active, group.sortOrder]));
   for (const rule of rules) records.push(fingerprintRecord("R", [
-    rule.id, rule.sourceSystemId, rule.scopeType, rule.nodeId, rule.targetGroupId,
+    rule.id, rule.sourceSystemId, rule.scopeType, rule.nodeId, rule.ruleAction, rule.targetGroupId,
     rule.effectiveFrom, rule.effectiveTo, rule.status
   ]));
   for (const product of products) records.push(fingerprintRecord("P", [

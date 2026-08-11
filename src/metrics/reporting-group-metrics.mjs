@@ -14,7 +14,7 @@ export const MAPPING_STATES = Object.freeze([
 ]);
 
 const MAPPING_STATE_SET = new Set(MAPPING_STATES);
-const FINGERPRINT_VERSION = "PULSE-MAPPING-SEMANTIC-V1";
+const FINGERPRINT_VERSION = "PULSE-MAPPING-SEMANTIC-V2";
 
 export function computeMappingFingerprint({
   asOfDate,
@@ -40,6 +40,7 @@ export function computeMappingFingerprint({
       rule.sourceSystemId,
       rule.scopeType,
       rule.nodeId,
+      normalizeRuleAction(rule),
       rule.targetReportingGroupId ?? rule.targetGroupId,
       rule.effectiveFrom,
       rule.effectiveTo,
@@ -62,6 +63,10 @@ export function computeMappingFingerprint({
 
   records.sort();
   return hashRecords(records);
+}
+
+function normalizeRuleAction(rule) {
+  return String(rule.ruleAction ?? rule.action ?? "").trim() || "Map";
 }
 
 export function validateEffectiveMappingFreshness({

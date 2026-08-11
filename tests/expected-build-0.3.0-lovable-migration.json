@@ -1,0 +1,65 @@
+{
+  "logical_decisions": {
+    "total": 129,
+    "source_main_category_maps": 70,
+    "source_subcategory_maps": 2,
+    "product_maps": 49,
+    "product_exclusions": 8
+  },
+  "source": {
+    "fact_count": 18086,
+    "sales_nok": 426611113.82,
+    "quantity": 2069940.12
+  },
+  "states": {
+    "Mapped": {
+      "fact_count": 15935,
+      "sales_nok": 405493085.13,
+      "quantity": 1925100.06
+    },
+    "Unmapped": {
+      "fact_count": 2151,
+      "sales_nok": 21118028.69,
+      "quantity": 144840.06
+    },
+    "Conflict": {
+      "fact_count": 0,
+      "sales_nok": 0,
+      "quantity": 0
+    },
+    "Inactive Target": {
+      "fact_count": 0,
+      "sales_nok": 0,
+      "quantity": 0
+    }
+  },
+  "coverage_percent": {
+    "facts": 88.11,
+    "sales_nok": 95.05,
+    "quantity": 93.00
+  },
+  "live_excel_qa": {
+    "date": "2026-08-12",
+    "status": "PASS",
+    "mapping_fingerprint": "MAP-342029f71a922b47",
+    "highest_mapping_rule_id": "MAP-000133",
+    "all_reconciliation_scopes": "PASS",
+    "source_facts_unchanged": "PASS",
+    "legacy_equivalence_qa": "WARN - no definitions",
+    "scopes": {
+      "2025 baseline": { "mapped_facts": 12485, "unmapped_facts": 1869, "total_facts": 14354 },
+      "W31 2026": { "mapped_facts": 3450, "unmapped_facts": 282, "total_facts": 3732 }
+    }
+  },
+  "reporting_groups": {
+    "RPG-0001": { "name": "Add-ons", "fact_count": 1632, "sales_nok": 4675282.00, "quantity": 89257.00 },
+    "RPG-0002": { "name": "Non-Alcohol", "fact_count": 1174, "sales_nok": 15191061.00, "quantity": 232317.50 },
+    "RPG-0003": { "name": "Spirits/Cocktails", "fact_count": 2314, "sales_nok": 13044456.00, "quantity": 76001.32 },
+    "RPG-0004": { "name": "Coffee & Tea", "fact_count": 841, "sales_nok": 3468276.00, "quantity": 50715.51 },
+    "RPG-0005": { "name": "Beer & Cider", "fact_count": 461, "sales_nok": 22134730.00, "quantity": 161469.47 },
+    "RPG-0006": { "name": "Desserts", "fact_count": 389, "sales_nok": 14476736.00, "quantity": 80901.73 },
+    "RPG-0007": { "name": "Wine & Sake", "fact_count": 1513, "sales_nok": 28839442.00, "quantity": 104471.45 },
+    "RPG-0008": { "name": "Starters", "fact_count": 1266, "sales_nok": 23863705.00, "quantity": 135290.75 },
+    "RPG-0009": { "name": "Mains", "fact_count": 6345, "sales_nok": 279799397.13, "quantity": 994675.33 }
+  }
+}

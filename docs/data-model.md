@@ -27,15 +27,20 @@ The category or classification supplied by the originating system.
 
 ### Mapping Rule
 A durable explicit rule targeting a generic source hierarchy scope/node and a
-Reporting Group ID. Current supported scopes are SourceMainCategory,
-SourceSubCategory, and Product. Effective intervals are inclusive; overlapping
-active rules on the same node/scope are conflicts.
+Reporting Group ID. `RuleAction=Map` is the legacy/default behavior. The narrow
+`RuleAction=Exclude` extension is valid only at Product scope, has no Reporting
+Group target, and explicitly resolves that Product to Unmapped. Current
+supported scopes are SourceMainCategory, SourceSubCategory, and Product.
+Effective intervals are inclusive; overlapping active rules on the same
+node/scope are conflicts regardless of action.
 
 ### Effective Mapping
 One computed row per product showing applicable ancestor/product rules, the
 winning rule, Reporting Group, explicit versus inherited state, and status.
 Resolution is most-specific explicit mapping, otherwise nearest mapped ancestor,
-otherwise Unmapped.
+otherwise Unmapped. An active Product exclusion wins at Product specificity and
+records `ResolutionState=Explicit exclusion` plus the winning rule ID. When the
+exclusion is deactivated, normal ancestor inheritance resumes.
 
 ### Metric Reporting Group Fact
 A derived analytical row joining one immutable Sales Fact to its Product's
