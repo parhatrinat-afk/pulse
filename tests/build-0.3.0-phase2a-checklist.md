@@ -81,3 +81,26 @@ Run after applying Phase 1 and then Phase 2A to a copy of the validated
 - [ ] Runtime is acceptable against the 18,086-row checkpoint.
 - [ ] New sheets are readable and tables have usable widths/filters.
 - [ ] A saved Phase 2A QA checkpoint is reviewed before Phase 2B begins.
+
+## Recorded live checkpoint — 2026-08-11
+
+Workbook: `Pulse_Build_0_3_0_Phase2A_QA.xlsx`
+
+- [x] Phase 2A compiled and completed in Excel for the web after indexed-range
+  runtime hardening.
+- [x] `tblMetricRPGFacts` contained exactly 18,086 data rows at
+  `_Metric_RPG_Facts!A4:T18090`.
+- [x] Fact count, Sales NOK 426,611,113.82, and Quantity 2,069,940.12
+  reconciled between source facts and the bridge.
+- [x] Mapped, Unmapped, Conflict, and Inactive Target state coverage reconciled
+  for all generated scopes.
+- [x] All reconciliation rows reported PASS.
+- [x] Source facts remained protected with fingerprint
+  `DATA-19428a5949d194ed`.
+- [x] `_Metric_Calc`, Performance, Reports, and KPI Registry protection
+  reported PASS.
+- [x] The temporary `EQ-QA-0001` row was removed and the equivalence table was
+  verified empty after the cleanup rerun.
+- [x] QA-0302A-08 returned WARN with zero inferred equivalences, as expected
+  until real ID-based definitions are authored.
+- [x] No Phase 2B metric or presentation cutover was performed.

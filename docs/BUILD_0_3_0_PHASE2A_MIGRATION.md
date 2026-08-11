@@ -169,19 +169,50 @@ Registry during execution. It does not change:
 - channel UI;
 - KPI-0001 metadata or availability.
 
-## Validation still requiring Excel
+## Live Excel QA — 2026-08-11
+
+`Pulse_Build_0_3_0_Phase2A_QA.xlsx` was rebuilt and reviewed in Excel for the
+web using the Phase 2A source at commit
+`045b8938159d544bfc75206c9ca735d8da11d609`.
+
+The final clean run confirmed:
+
+- the Office Script completed without the prior iterator or
+  `Worksheet.getRange` runtime failures;
+- MappingAsOfDate was 2026-08-11 and the reproducible mapping fingerprint was
+  `MAP-3416c94758ea1743`;
+- `tblMetricRPGFacts` occupied `A4:T18090` and contained exactly 18,086 data
+  rows, one for each source fact;
+- all-facts Sales NOK reconciled exactly at 426,611,113.82;
+- all-facts Quantity reconciled at 2,069,940.12, subject only to the displayed
+  floating-point residue already accepted by the deterministic tolerance;
+- mapped coverage was 521 facts, Sales NOK 1,013,589.00, and Quantity
+  20,171.11;
+- unmapped coverage was 17,565 facts, Sales NOK 425,597,524.82, and Quantity
+  2,049,769.01;
+- Conflict and Inactive Target coverage were both zero for this clean
+  checkpoint;
+- all generated all-facts, import, and channel reconciliation rows reported
+  PASS for fact count, Sales NOK, Quantity, and four-state coverage;
+- source-fact protection reported PASS with fingerprint
+  `DATA-19428a5949d194ed`;
+- `_Metric_Calc`, Performance, Reports, and KPI Registry protection reported
+  PASS;
+- Reporting Group totals were materialized for `RPG-0001` / Add-ons and
+  reconciled to the mapped coverage;
+- the temporary `EQ-QA-0001` QA row was removed without replacing the
+  human-owned equivalence table, then Phase 2A was rerun;
+- `tblLegacyRPGEquivalence` was empty after cleanup,
+  `tblLegacyRPGComparison` contained no inferred definitions, and
+  QA-0302A-08 returned the expected WARN: no equivalence definitions entered
+  yet.
+
+This evidence validates the Phase 2A runtime and clean checkpoint only. It does
+not activate the Reporting Group metric path in Performance or begin Phase 2B.
+
+## Remaining Excel validation for later migration work
 
 Automated tests validate the deterministic contract and Office Script source,
-but the following require Excel for the web / Work-mode validation:
-
-- Office Scripts compiler/runtime compatibility;
-- runtime and memory behavior when writing and rereading 18,086 bridge rows;
-- confirmation that the indexed-range hardening completes without a
-  `Worksheet.getRange` `GeneralException` or a protected-surface read-in-loop
-  warning;
-- table creation and rerun behavior;
-- stale-mapping failure followed by successful Phase 1/Phase 2A refresh;
-- preservation of human equivalence rows across reruns;
-- visual inspection of the new contract, equivalence, bridge, and QA sheets;
-- verification that existing Performance and Reports values are unchanged in
-  the migrated workbook.
+and the 2026-08-11 live run validates Phase 2A against the current checkpoint.
+Future mapping changes, real human-authored equivalence definitions, and the
+Phase 2B metric cutover require their own Excel QA before release.

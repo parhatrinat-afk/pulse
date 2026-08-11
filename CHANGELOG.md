@@ -31,12 +31,14 @@ All meaningful Pulse changes are recorded here.
 - Hardened Excel-for-web output range handling with bounded indexed ranges,
   exact range diagnostics, output row-width checks, and batched protected-sheet
   reads for the 18,086-row checkpoint.
+- Completed live Excel-for-web Phase 2A QA on 2026-08-11: all source/bridge and
+  mapping-state reconciliations passed, legacy surfaces remained protected, and
+  the clean no-equivalence state returned the expected WARN.
 - Preserved `_Metric_Calc`, Performance, Reports, KPI Registry, KPI-0001, raw
   source data, and `_Sales_Facts` unchanged.
 
 ### Still planned / later phases
 
-- Complete live Excel-for-web Phase 2A runtime and workbook QA.
 - Migrate central metric membership and active Reporting Group selectors in
   Phase 2B.
 - Cut Performance and Reports over without a visual redesign in Phase 2B.
