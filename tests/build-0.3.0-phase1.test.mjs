@@ -128,3 +128,19 @@ test("Office Script list validation uses Range objects", () => {
   assert.doesNotMatch(validationBody, /source:\s*["'`]\s*=.*_Mapping_Lists/);
   assert.equal((validationBody.match(/source:(?:actionSource|scopeSource|activeGroupSource|statusSource)/g) ?? []).length, 6);
 });
+
+test("Office Script avoids unsupported Map and Set iterator constructs", () => {
+  const script = fs.readFileSync(
+    new URL("../office-scripts/Build_0_3_0_Phase1.ts", import.meta.url),
+    "utf8",
+  );
+  const collectionNames = "groupById|seen|classificationById|context|resultByProduct|main|subs|mappedIds|map";
+
+  assert.doesNotMatch(script, /Array\.from\s*\(/);
+  assert.doesNotMatch(script, /\.(?:entries|keys|values)\s*\(/);
+  assert.doesNotMatch(script, new RegExp(`for\\s*\\([^)]*\\bof\\s+(?:${collectionNames})\\b`));
+  assert.doesNotMatch(script, new RegExp(`\\.\\.\\.(?:${collectionNames})\\b`));
+  assert.match(script, /context\.forEach\s*\(/);
+  assert.match(script, /main\.forEach\s*\(/);
+  assert.match(script, /subs\.forEach\s*\(/);
+});

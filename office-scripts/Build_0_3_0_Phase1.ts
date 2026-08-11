@@ -358,12 +358,16 @@ function writeMappingSurface(
   }
   let row = 15;
   sheet.getRange(`A${row}:L${row}`).setValues([["SourceSystemID", "ScopeType", "NodeID", "SourceMainCategory", "Explicit Rule(s)", "Target Group ID(s)", "Subcategories", "Products", "Inheriting products", "Sales NOK (Active)", "Quantity (Active)", "Descendant exceptions"]]);
-  const mainValues = Array.from(main.entries()).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([id,v]) => [v.source,"SourceMainCategory",id,v.name,Array.from(v.ruleIds).join(", "),Array.from(v.targetIds).join(", "),v.subs.size,v.products.size,v.inherited,v.sales,v.qty,v.exceptions]);
+  const mainValues: (string|number)[][] = [];
+  main.forEach((v,id) => mainValues.push([v.source,"SourceMainCategory",id,v.name,joinSet(v.ruleIds),joinSet(v.targetIds),v.subs.size,v.products.size,v.inherited,v.sales,v.qty,v.exceptions]));
+  mainValues.sort((a,b)=>text(a[3]).localeCompare(text(b[3])));
   if (mainValues.length) sheet.getRangeByIndexes(row,0,mainValues.length,12).setValues(mainValues); const mt=sheet.addTable(`A${row}:L${Math.max(row,row+mainValues.length)}`,true); mt.setName("tblMappingMainNodes"); mt.setPredefinedTableStyle("TableStyleMedium2");
   if (mainValues.length) { sheet.getRange(`G${row + 1}:I${row + mainValues.length}`).setNumberFormat("#,##0"); sheet.getRange(`J${row + 1}:K${row + mainValues.length}`).setNumberFormat("#,##0.00"); sheet.getRange(`L${row + 1}:L${row + mainValues.length}`).setNumberFormat("#,##0"); }
   row += Math.max(2, mainValues.length + 3);
   sheet.getRange(`A${row}:M${row}`).setValues([["SourceSystemID", "ScopeType", "NodeID", "SourceMainCategory", "SourceSubCategory", "Explicit Rule(s)", "Target Group ID(s)", "Products", "Inheriting products", "Sales NOK (Active)", "Quantity (Active)", "Product exceptions", "Browse cue"]]);
-  const subValues = Array.from(subs.entries()).sort((a,b)=>a[1].main.localeCompare(b[1].main)||a[1].name.localeCompare(b[1].name)).map(([id,v]) => [v.source,"SourceSubCategory",id,v.main,v.name,Array.from(v.ruleIds).join(", "),Array.from(v.targetIds).join(", "),v.products.size,v.inherited,v.sales,v.qty,v.exceptions,"Filter products below by NodeID"]);
+  const subValues: (string|number)[][] = [];
+  subs.forEach((v,id) => subValues.push([v.source,"SourceSubCategory",id,v.main,v.name,joinSet(v.ruleIds),joinSet(v.targetIds),v.products.size,v.inherited,v.sales,v.qty,v.exceptions,"Filter products below by NodeID"]));
+  subValues.sort((a,b)=>text(a[3]).localeCompare(text(b[3]))||text(a[4]).localeCompare(text(b[4])));
   if(subValues.length) sheet.getRangeByIndexes(row,0,subValues.length,13).setValues(subValues); const st=sheet.addTable(`A${row}:M${Math.max(row,row+subValues.length)}`,true); st.setName("tblMappingSubcategoryNodes"); st.setPredefinedTableStyle("TableStyleMedium2");
   if (subValues.length) { sheet.getRange(`H${row + 1}:I${row + subValues.length}`).setNumberFormat("#,##0"); sheet.getRange(`J${row + 1}:K${row + subValues.length}`).setNumberFormat("#,##0.00"); sheet.getRange(`L${row + 1}:L${row + subValues.length}`).setNumberFormat("#,##0"); }
   row += Math.max(2, subValues.length + 3);
@@ -407,7 +411,8 @@ function writeMappingQA(
 ): void {
   const sheet=resetOutputSheet(workbook,"Mapping QA","tblMappingQA","tblMappingConflicts"); writeTitle(sheet,"Mapping QA","Deterministic Phase 1 checks. Mapping redistributes classification only; raw/fact totals remain unchanged.","H");
   const duplicateGroupIds=groups.length-new Set(groups.map(g=>g.id)).size; const mappedIds=new Set(resolved.filter(r=>r.resolutionStatus==="Mapped"||r.resolutionStatus==="Inactive Target").map(r=>r.productId));
-  let mappedSales=0,mappedQty=0,unmappedSales=0,unmappedQty=0; for(const [productId,v] of context){ if(mappedIds.has(productId)){mappedSales+=v.sales;mappedQty+=v.quantity;}else{unmappedSales+=v.sales;unmappedQty+=v.quantity;} }
+  let mappedSales=0,mappedQty=0,unmappedSales=0,unmappedQty=0;
+  context.forEach((v,productId) => { if(mappedIds.has(productId)){mappedSales+=v.sales;mappedQty+=v.quantity;}else{unmappedSales+=v.sales;unmappedQty+=v.quantity;} });
   const checks:(string|number)[][]=[
     ["QA-0301-01","Reporting Group IDs unique",duplicateGroupIds===0?"PASS":"FAIL",duplicateGroupIds,"Stable IDs must be unique."],
     ["QA-0301-02","Seed registry present",groups.length>=9?"PASS":"FAIL",groups.length,"At least the nine Phase 1 seeds must exist."],
@@ -444,6 +449,7 @@ function almostEqual(a:number,b:number):boolean{return Math.abs(a-b)<=Math.max(0
 function ids(rules:MappingRule[]):string{return rules.map(r=>r.id).join(", ");}
 function targets(rules:MappingRule[]):string{return rules.map(r=>r.targetGroupId).join(", ");}
 function addDelimited(target:Set<string>,value:string):void{for(const item of value.split(",")){const normalized=item.trim();if(normalized)target.add(normalized);}}
+function joinSet(values:Set<string>):string{const items:string[]=[];values.forEach(value=>items.push(value));return items.join(", ");}
 function mainNodeId(sourceSystemId:string,mainCategory:string):string{return `${sourceSystemId} || Main || ${mainCategory}`;}
 
 function resetOutputSheet(workbook:ExcelScript.Workbook,name:string,...tableNames:string[]):ExcelScript.Worksheet{

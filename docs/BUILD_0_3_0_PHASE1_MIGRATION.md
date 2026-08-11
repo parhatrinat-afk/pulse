@@ -34,3 +34,7 @@ Worksheet-backed list validations use `ExcelScript.Range` objects from
 `_Mapping_Lists`. Cross-sheet formula strings are not used as
 `ListDataValidation.source`, because Office Scripts interprets string sources as
 comma-separated literal lists and rejects those formula strings at runtime.
+
+Map and Set collections are traversed with `forEach` callbacks. Iterator-based
+`for...of`, `entries`, and `Array.from` patterns are avoided for compatibility
+with the Office Scripts TypeScript compiler target.
