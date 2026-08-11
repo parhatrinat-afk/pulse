@@ -1,0 +1,35 @@
+{
+  "build": "0.2.0",
+  "checkpoint_input": "Pulse_Build_0_1_1.xlsx",
+  "kpi": {
+    "id": "KPI-0001",
+    "name": "Category Sales Share",
+    "definition": "Category Sales Amount / Total Sales Amount within selected scope",
+    "channel_neutral": true
+  },
+  "regression": {
+    "category": "Add-ons",
+    "checks": [
+      {
+        "dataset": "Week 31, 2026",
+        "channel": "In-house",
+        "share": 0.0016860419239880125
+      },
+      {
+        "dataset": "2025 full year",
+        "channel": "In-house",
+        "share": 0.0011694463905995668
+      },
+      {
+        "dataset": "Week 31, 2026",
+        "channel": "Takeaway",
+        "share": 0.0008772439243303932
+      },
+      {
+        "dataset": "2025 full year",
+        "channel": "Takeaway",
+        "share": 0.0015417467932670335
+      }
+    ]
+  }
+}
