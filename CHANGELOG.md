@@ -4,17 +4,20 @@ All meaningful Pulse changes are recorded here.
 
 ## Unreleased — 0.3.0 — Mapping + Reporting Groups
 
-### Planned / in development
+### Implemented in Phase 1 foundation
 
-- Introduce business-defined Reporting Groups as a semantic layer between source classifications and metrics.
-- Preserve source hierarchy and raw source data rather than replacing source classifications.
-- Support hierarchical mapping: map at the highest safe source level and inherit downward.
-- Allow more-specific explicit mappings to override inherited mappings.
-- Keep the mapping resolver conceptually hierarchy-aware rather than permanently coupling it to one POS structure.
-- Allow Reporting Groups to be active or inactive; active groups become available to Performance.
-- Keep Reporting Groups separate from KPI definitions.
+- Added a rerunnable Phase 1 Office Script for the validated 0.2.0-QA checkpoint.
+- Added an authoritative Reporting Group registry with nine stable seed IDs.
+- Added generic scope/node Mapping Rules targeting Reporting Group IDs.
+- Added hierarchy browse tables with descendant counts and sales/quantity context.
+- Added deterministic Effective Mapping output with explicit/inherited state.
+- Added overlap-conflict, inactive-target, unmapped, and reconciliation QA.
+- Preserved legacy Reporting Categories, Remap Rules, facts, and the 0.2.0 metric path.
+
+### Still planned / later phases
+
 - Prepare Performance to consume Reporting Groups instead of exposing the full raw POS classification set.
-- Preserve human control, deterministic resolution, traceability, and recoverability.
+- Migrate metric membership and active Reporting Group selectors in Phase 2.
 
 This section describes active development only. It does not advance the validated release checkpoint.
 

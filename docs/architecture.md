@@ -10,12 +10,24 @@ Pulse separates raw/source data, standardized facts, business classification, de
 2. **Adapter / staging** — source-specific translation into Pulse's neutral structure.
 3. **Validation** — period, coverage, duplicates, structure, and import safeguards.
 4. **Published facts** — trusted standardized observations.
-5. **Classification** — products and source categories mapped to stable reporting concepts.
-6. **Metric engine** — deterministic calculations from published facts.
-7. **KPI Registry** — defines which metrics are active and how they may be presented.
-8. **Performance** — interactive exploration of trusted KPI results.
-9. **Reports** — meeting-ready consumption of the same metric results.
-10. **Human context** — acknowledgement/explanation without rewriting the underlying facts.
+5. **Mapping** — explicit human-authored rules over source hierarchy nodes.
+6. **Reporting Groups** — stable business-owned semantic classifications resolved by inheritance.
+7. **Metric engine** — deterministic calculations from published facts after mapping resolution.
+8. **KPI Registry** — defines which metrics are active and how they may be presented.
+9. **Performance** — interactive exploration of trusted KPI results.
+10. **Reports** — meeting-ready consumption of the same metric results.
+11. **Human context** — acknowledgement/explanation without rewriting the underlying facts.
+
+## Phase 1 mapping implementation
+
+Build 0.3.0 Phase 1 stores mappings as generic scope/node rules targeting stable
+Reporting Group IDs. The current source hierarchy resolves Product → Source
+Subcategory → Source Main Category, but those are adapter-exposed levels rather
+than a permanent three-level platform limit. Inheritance is computed and does
+not copy parent rules into descendant rows.
+
+Performance integration is deliberately deferred: the validated 0.2.0 category
+metric path remains in place until Phase 2.
 
 ## Layers
 
