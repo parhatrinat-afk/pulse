@@ -30,10 +30,13 @@ they differ.
 
 ## Office Scripts runtime compatibility
 
-Worksheet-backed list validations use `ExcelScript.Range` objects from
-`_Mapping_Lists`. Cross-sheet formula strings are not used as
-`ListDataValidation.source`, because Office Scripts interprets string sources as
-comma-separated literal lists and rejects those formula strings at runtime.
+List validations read the current values from `_Mapping_Lists` and pass them to
+`ListDataValidation.source` as comma-separated literal strings. This follows the
+documented Office Scripts pattern while keeping active Reporting Group IDs
+derived from the human-editable `Reporting Groups` registry. Each dropdown is
+wired independently; a rejected nonessential validation is surfaced as
+`PUL-0301-013` on `Mapping` and in the script result without blocking mapping
+recomputation.
 
 Map and Set collections are traversed with `forEach` callbacks. Iterator-based
 `for...of`, `entries`, and `Array.from` patterns are avoided for compatibility

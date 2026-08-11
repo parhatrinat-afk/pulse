@@ -115,18 +115,25 @@ test("classification cannot change fact totals", () => {
   assert.equal(mapped.quantity + unmapped.quantity, total.quantity);
 });
 
-test("Office Script list validation uses Range objects", () => {
+test("Office Script list validation uses resilient literal value sources", () => {
   const script = fs.readFileSync(
     new URL("../office-scripts/Build_0_3_0_Phase1.ts", import.meta.url),
     "utf8",
   );
   const validationBody = script.match(
-    /function wireMappingValidation[\s\S]*?\n}\n\nfunction writeMappingQA/,
+    /function wireMappingValidation[\s\S]*?\n}\n\nfunction applyListValidation/,
   )?.[0] ?? "";
 
   assert.ok(validationBody, "wireMappingValidation function must exist");
-  assert.doesNotMatch(validationBody, /source:\s*["'`]\s*=.*_Mapping_Lists/);
-  assert.equal((validationBody.match(/source:(?:actionSource|scopeSource|activeGroupSource|statusSource)/g) ?? []).length, 6);
+  assert.equal((validationBody.match(/applyListValidation\(/g) ?? []).length, 6);
+  assert.equal((validationBody.match(/,activeGroupSource,/g) ?? []).length, 2);
+  assert.doesNotMatch(validationBody, /setRule\(\{list:\{[^}]*source:(?:actionSource|scopeSource|activeGroupSource|statusSource)/);
+  assert.match(script, /sourceRange\.getValues\(\)\.forEach/);
+  assert.match(script, /const source=items\.join\(","\)/);
+  assert.match(script, /validation\.setRule\(\{list:\{inCellDropDown:true,source:source\}\}\)/);
+  assert.match(script, /catch\(error\)\{failures\.push/);
+  assert.match(validationBody, /PUL-0301-013/);
+  assert.match(validationBody, /sheet\.getRange\("E8"\)\.setValue\(message\)/);
 });
 
 test("Office Script avoids unsupported Map and Set iterator constructs", () => {

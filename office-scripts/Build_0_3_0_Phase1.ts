@@ -42,7 +42,7 @@ function main(workbook: ExcelScript.Workbook): string {
   writeEffectiveMapping(workbook, resolved);
   writeMappingSurface(workbook, hierarchy, resolved, salesContext, groups, actionMessage);
   writeMappingLists(workbook, groups);
-  wireMappingValidation(workbook);
+  const validationMessage = wireMappingValidation(workbook);
   writeMappingQA(workbook, groups, rules, conflicts, resolved, factSnapshot, salesContext);
 
   const factAfter = snapshotFacts(facts);
@@ -58,7 +58,7 @@ function main(workbook: ExcelScript.Workbook): string {
     `${resolved.length} products resolved; ${conflicts.length} overlapping rule conflict(s); facts unchanged.`
   ]);
   workbook.getApplication().calculate(ExcelScript.CalculationType.full);
-  return `Pulse 0.3.0 Phase 1 refreshed. ${groups.length} Reporting Groups, ${rules.length} rule(s), ${resolved.length} product(s). ${actionMessage}`;
+  return `Pulse 0.3.0 Phase 1 refreshed. ${groups.length} Reporting Groups, ${rules.length} rule(s), ${resolved.length} product(s). ${actionMessage} ${validationMessage}`;
 }
 
 type ReportingGroup = { id: string; name: string; active: string; sortOrder: number };
@@ -388,21 +388,44 @@ function writeMappingLists(workbook: ExcelScript.Workbook, groups: ReportingGrou
   sheet.getRange("C2:C3").setValues([["Apply"],["Deactivate"]]); sheet.getRange("D2:D3").setValues([["Active"],["Inactive"]]);
 }
 
-function wireMappingValidation(workbook: ExcelScript.Workbook): void {
+function wireMappingValidation(workbook: ExcelScript.Workbook): string {
   const sheet = requiredSheet(workbook,"Mapping");
   const listsSheet = requiredSheet(workbook,"_Mapping_Lists");
   const groupCount=countPopulated(listsSheet.getRange("A2:A1000").getValues());
+  const rulesSheet = requiredSheet(workbook,"Mapping Rules");
   const actionSource = listsSheet.getRange("C2:C3");
   const scopeSource = listsSheet.getRange("B2:B4");
   const activeGroupSource = listsSheet.getRange(`A2:A${Math.max(2,groupCount+1)}`);
   const statusSource = listsSheet.getRange("D2:D3");
-  sheet.getRange("B5").getDataValidation().setRule({list:{inCellDropDown:true,source:actionSource}});
-  sheet.getRange("B7").getDataValidation().setRule({list:{inCellDropDown:true,source:scopeSource}});
-  sheet.getRange("B9").getDataValidation().setRule({list:{inCellDropDown:true,source:activeGroupSource}});
-  const rulesSheet = requiredSheet(workbook,"Mapping Rules");
-  rulesSheet.getRange("C5:C1000").getDataValidation().setRule({list:{inCellDropDown:true,source:scopeSource}});
-  rulesSheet.getRange("G5:G1000").getDataValidation().setRule({list:{inCellDropDown:true,source:activeGroupSource}});
-  rulesSheet.getRange("J5:J1000").getDataValidation().setRule({list:{inCellDropDown:true,source:statusSource}});
+  const failures: string[] = [];
+  applyListValidation(sheet.getRange("B5"),actionSource,"Mapping!B5 Action",failures);
+  applyListValidation(sheet.getRange("B7"),scopeSource,"Mapping!B7 ScopeType",failures);
+  applyListValidation(sheet.getRange("B9"),activeGroupSource,"Mapping!B9 TargetReportingGroupID",failures);
+  applyListValidation(rulesSheet.getRange("C5:C1000"),scopeSource,"Mapping Rules!C5:C1000 ScopeType",failures);
+  applyListValidation(rulesSheet.getRange("G5:G1000"),activeGroupSource,"Mapping Rules!G5:G1000 TargetReportingGroupID",failures);
+  applyListValidation(rulesSheet.getRange("J5:J1000"),statusSource,"Mapping Rules!J5:J1000 Status",failures);
+  const message = failures.length
+    ? `PUL-0301-013: ${failures.length} dropdown validation(s) unavailable; mapping refresh completed. ${failures.join(" | ")}`
+    : "Dropdown validation ready (6/6).";
+  sheet.getRange("E8").setValue(message);
+  const statusBand=sheet.getRange("E8:N8");
+  statusBand.getFormat().getFill().setColor(failures.length?"#FCE8E6":"#E2F0D9");
+  statusBand.getFormat().setWrapText(true);
+  sheet.getRange("8:8").getFormat().setRowHeight(failures.length?72:30);
+  failures.forEach(failure=>console.log(`PUL-0301-013 ${failure}`));
+  return message;
+}
+
+function applyListValidation(target:ExcelScript.Range,sourceRange:ExcelScript.Range,label:string,failures:string[]):void{
+  try{
+    const validation=target.getDataValidation();validation.clear();
+    const items:string[]=[];
+    sourceRange.getValues().forEach(row=>{const item=text(row[0]);if(item)items.push(item);});
+    if(!items.length)throw new Error("source list is empty");
+    if(items.some(item=>item.indexOf(",")>=0))throw new Error("source item contains a comma");
+    const source=items.join(",");
+    validation.setRule({list:{inCellDropDown:true,source:source}});
+  }catch(error){failures.push(`${label}: ${text(error)}`);}
 }
 
 function writeMappingQA(
