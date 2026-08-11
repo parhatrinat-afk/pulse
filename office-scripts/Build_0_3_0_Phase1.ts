@@ -385,14 +385,20 @@ function writeMappingLists(workbook: ExcelScript.Workbook, groups: ReportingGrou
 }
 
 function wireMappingValidation(workbook: ExcelScript.Workbook): void {
-  const sheet = requiredSheet(workbook,"Mapping"); const groupCount=countPopulated(requiredSheet(workbook,"_Mapping_Lists").getRange("A2:A1000").getValues());
-  sheet.getRange("B5").getDataValidation().setRule({list:{inCellDropDown:true,source:"='_Mapping_Lists'!$C$2:$C$3"}});
-  sheet.getRange("B7").getDataValidation().setRule({list:{inCellDropDown:true,source:"='_Mapping_Lists'!$B$2:$B$4"}});
-  sheet.getRange("B9").getDataValidation().setRule({list:{inCellDropDown:true,source:`='_Mapping_Lists'!$A$2:$A$${Math.max(2,groupCount+1)}`}});
+  const sheet = requiredSheet(workbook,"Mapping");
+  const listsSheet = requiredSheet(workbook,"_Mapping_Lists");
+  const groupCount=countPopulated(listsSheet.getRange("A2:A1000").getValues());
+  const actionSource = listsSheet.getRange("C2:C3");
+  const scopeSource = listsSheet.getRange("B2:B4");
+  const activeGroupSource = listsSheet.getRange(`A2:A${Math.max(2,groupCount+1)}`);
+  const statusSource = listsSheet.getRange("D2:D3");
+  sheet.getRange("B5").getDataValidation().setRule({list:{inCellDropDown:true,source:actionSource}});
+  sheet.getRange("B7").getDataValidation().setRule({list:{inCellDropDown:true,source:scopeSource}});
+  sheet.getRange("B9").getDataValidation().setRule({list:{inCellDropDown:true,source:activeGroupSource}});
   const rulesSheet = requiredSheet(workbook,"Mapping Rules");
-  rulesSheet.getRange("C5:C1000").getDataValidation().setRule({list:{inCellDropDown:true,source:"='_Mapping_Lists'!$B$2:$B$4"}});
-  rulesSheet.getRange("G5:G1000").getDataValidation().setRule({list:{inCellDropDown:true,source:`='_Mapping_Lists'!$A$2:$A$${Math.max(2,groupCount+1)}`}});
-  rulesSheet.getRange("J5:J1000").getDataValidation().setRule({list:{inCellDropDown:true,source:"='_Mapping_Lists'!$D$2:$D$3"}});
+  rulesSheet.getRange("C5:C1000").getDataValidation().setRule({list:{inCellDropDown:true,source:scopeSource}});
+  rulesSheet.getRange("G5:G1000").getDataValidation().setRule({list:{inCellDropDown:true,source:activeGroupSource}});
+  rulesSheet.getRange("J5:J1000").getDataValidation().setRule({list:{inCellDropDown:true,source:statusSource}});
 }
 
 function writeMappingQA(

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 import { findRuleConflicts, resolveProduct } from "../src/mapping/hierarchical-resolver.mjs";
 
@@ -112,4 +113,18 @@ test("classification cannot change fact totals", () => {
   const unmapped = { sales: facts[1].sales, quantity: facts[1].quantity };
   assert.equal(mapped.sales + unmapped.sales, total.sales);
   assert.equal(mapped.quantity + unmapped.quantity, total.quantity);
+});
+
+test("Office Script list validation uses Range objects", () => {
+  const script = fs.readFileSync(
+    new URL("../office-scripts/Build_0_3_0_Phase1.ts", import.meta.url),
+    "utf8",
+  );
+  const validationBody = script.match(
+    /function wireMappingValidation[\s\S]*?\n}\n\nfunction writeMappingQA/,
+  )?.[0] ?? "";
+
+  assert.ok(validationBody, "wireMappingValidation function must exist");
+  assert.doesNotMatch(validationBody, /source:\s*["'`]\s*=.*_Mapping_Lists/);
+  assert.equal((validationBody.match(/source:(?:actionSource|scopeSource|activeGroupSource|statusSource)/g) ?? []).length, 6);
 });

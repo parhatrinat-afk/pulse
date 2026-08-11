@@ -27,3 +27,10 @@ unchanged until Phase 2 metric integration.
 The script snapshots fact row count, total quantity, total sales, Active
 Finalized totals, and boundary fact IDs before and after migration and fails if
 they differ.
+
+## Office Scripts runtime compatibility
+
+Worksheet-backed list validations use `ExcelScript.Range` objects from
+`_Mapping_Lists`. Cross-sheet formula strings are not used as
+`ListDataValidation.source`, because Office Scripts interprets string sources as
+comma-separated literal lists and rejects those formula strings at runtime.
