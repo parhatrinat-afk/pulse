@@ -2,31 +2,70 @@
 
 The roadmap is intentionally conservative. New ideas are preserved, but they do not automatically enter the active build.
 
-## Build 0.2.0 — First usable metric
+## Validated foundation — Build 0.2.0-QA
 
-Deliver one complete vertical slice:
+The first deterministic reporting vertical slice has been built and QA-checked:
 
-`Published sales facts → deterministic metric → Performance → Reports`
+`Published sales facts → deterministic Category Sales Share → Performance → Reports`
 
-First KPI: **Category Sales Share**.
+The validated checkpoint supports independent current/comparison dataset selection and does not define In-house as part of the KPI itself.
 
-Success means the same trusted calculation can be viewed at company and restaurant level and reused by reporting without duplicating business logic.
+## Active build — 0.3.0 Mapping + Reporting Groups
 
-## Following builds
+Build the semantic layer that sits between source-system structure and business reporting:
 
-After the first metric is proven:
-- Category Quantity Share.
+`Raw POS data → Source hierarchy → Hierarchical Mapping → Reporting Groups → Metrics / KPIs → Performance`
+
+### Primary goals
+
+- Provide an easy way to browse and understand the POS hierarchy and its underlying products/sales.
+- Create business-defined Reporting Groups independent of raw POS categories.
+- Map a clean source branch once when safe.
+- Inherit mappings to descendants.
+- Allow more-specific mappings to override inherited mappings for mixed categories or exceptional products.
+- Preserve raw source data and source classifications.
+- Make mapping deterministic and explainable.
+- Allow Reporting Groups to be activated/deactivated for Performance availability.
+- Keep the architecture adaptable to future source systems and hierarchy depths.
+- Move Performance toward business Reporting Groups instead of exposing roughly 130 raw POS classifications.
+
+### Build sequencing
+
+1. **Phase 1 — semantic model and hierarchical mapping foundation**
+   - Reporting Group registry.
+   - Hierarchy-aware mapping rules/resolution.
+   - Mapping administration/browse surface.
+   - Explicit vs inherited mapping visibility.
+   - Unmapped visibility and QA.
+
+2. **Phase 2 — metric integration**
+   - Metrics consume resolved Reporting Groups.
+   - Preserve deterministic current/comparison selection.
+   - Validate aggregation and reconciliation to raw sales facts.
+
+3. **Phase 3 — Performance integration**
+   - Active Reporting Groups become selectable/presentable.
+   - Performance no longer exposes raw POS classifications as the primary business view.
+   - Validate user experience using real uploaded reports before simplifying existing pages.
+
+## Following sales-domain builds
+
+After the Reporting Group foundation is proven:
+
+- Quantity Share.
 - Add-ons Attach Rate.
 - Percentage-point Change.
-- Estimated NOK Impact.
+- Sales NOK and Quantity views.
+- Estimated NOK Impact where the methodology is sufficiently defensible.
 - Trend and leaderboard views where appropriate.
 
 ## Parked until the sales foundation is proven
 
-- Labour domain.
+- Labour domain: labour cost, worked hours, sick leave, restaurant and department splits.
 - Reviews / Google Business Performance adapter.
 - Forecasting.
 - Cross-domain presentation.
+- Configurable Restaurant of the Month scoring.
 - AI-assisted observations.
 - Automated presentation/export features beyond the validated reporting foundation.
 
