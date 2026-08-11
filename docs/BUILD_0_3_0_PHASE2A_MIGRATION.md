@@ -29,6 +29,30 @@ inputs and compares it to `tblEffectiveMapping` before writing any Phase 2A
 output. It fails with `PUL-0302A-001` when the materialized mapping is stale,
 incomplete, duplicated, structurally invalid, or resolved for another day.
 
+## Excel-for-web runtime hardening
+
+The first live Phase 2A run against the 18,086-row checkpoint surfaced a queued
+`Worksheet.getRange` `GeneralException` at the next workbook read. The generated
+bridge geometry was within Excel limits (`A4:T18090`), so the failure was not a
+row-count overflow. Phase 2A no longer uses string-address
+`Worksheet.getRange()` calls for output creation or formatting. Output ranges
+are acquired by bounded row/column indexes, output row widths are validated,
+and range failures report the sheet, computed A1 equivalent, and operation as
+`PUL-0302A-020` or `PUL-0302A-021`.
+
+Workbook/table reads used for the legacy-surface fingerprint are performed
+before in-memory hashing rather than from inside the hashing loop. Bridge data
+continues to be written in bounded chunks because a single 18,086-by-20 write
+is less reliable in Excel for the web.
+
+Office Scripts execution is not transactional. A failed run may therefore
+leave `Metric Contract`, `Metric Equivalence`, or `_Metric_RPG_Facts` partially
+created or formatted, while the later `Metric Migration QA`, environment, and
+build-log updates may be absent. A rerun clears and rebuilds the generated
+contract, bridge, and QA surfaces; the human-owned equivalence table is
+preserved. Raw data, `_Sales_Facts`, `_Metric_Calc`, Performance, Reports, and
+KPI-0001 are outside those output writes.
+
 ## Added workbook structures
 
 ### `Metric Contract` / `tblMetricContract`
@@ -152,6 +176,9 @@ but the following require Excel for the web / Work-mode validation:
 
 - Office Scripts compiler/runtime compatibility;
 - runtime and memory behavior when writing and rereading 18,086 bridge rows;
+- confirmation that the indexed-range hardening completes without a
+  `Worksheet.getRange` `GeneralException` or a protected-surface read-in-loop
+  warning;
 - table creation and rerun behavior;
 - stale-mapping failure followed by successful Phase 1/Phase 2A refresh;
 - preservation of human equivalence rows across reruns;

@@ -289,6 +289,45 @@ test("Phase 2A Office Script avoids unsupported Map and Set iterator constructs"
   assert.match(script, /active\.forEach\s*\(/);
 });
 
+test("Phase 2A Office Script uses bounded indexed output ranges with actionable diagnostics", () => {
+  const script = fs.readFileSync(
+    new URL("../office-scripts/Build_0_3_0_Phase2A.ts", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(script, /\.getRange\s*\(/, "string-address Worksheet.getRange calls must not return");
+  assert.match(script, /function checkedRangeByIndexes\s*\(/);
+  assert.match(script, /PUL-0302A-020: Invalid worksheet range/);
+  assert.match(script, /PUL-0302A-021: Worksheet range acquisition failed at/);
+  assert.match(script, /sheet\.addTable\(tableRange, true\)/);
+  assert.match(script, /validateOutputRows\(rows, headers\.length, sheetName, tableName\)/);
+
+  const bridgeStartRow = 4;
+  const checkpointFactRows = 18086;
+  assert.equal(bridgeStartRow + checkpointFactRows, 18090);
+  assert.ok(18090 <= 1048576, "checkpoint bridge range must fit on an Excel worksheet");
+});
+
+test("Phase 2A protected-surface reads are batched outside iteration", () => {
+  const script = fs.readFileSync(
+    new URL("../office-scripts/Build_0_3_0_Phase2A.ts", import.meta.url),
+    "utf8",
+  );
+  const snapshotBody = script.match(
+    /function snapshotProtectedSurfaces[\s\S]*?\n}\n\nfunction updateProtectedSnapshot/,
+  )?.[0];
+  assert.ok(snapshotBody, "snapshotProtectedSurfaces source must be present");
+  assert.doesNotMatch(snapshotBody, /for\s*\(/);
+  assert.match(snapshotBody, /metricCalcUsed\.getValues\(\)/);
+  assert.match(snapshotBody, /performanceUsed\.getValues\(\)/);
+  assert.match(snapshotBody, /reportsUsed\.getValues\(\)/);
+
+  const resetBody = script.match(
+    /function resetOutputSheet[\s\S]*?\n}\n\nfunction requiredSheet/,
+  )?.[0];
+  assert.ok(resetBody, "resetOutputSheet source must be present");
+  assert.doesNotMatch(resetBody, /workbook\.getTable\s*\(/);
+});
+
 function resolution(productId, groupId, groupName, source, state, status, winningRuleId, mainNodeId, subNodeId, extra = {}) {
   return {
     productId,

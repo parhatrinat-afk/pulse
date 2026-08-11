@@ -217,7 +217,8 @@ function readGroups(table: ExcelScript.Table): ReportingGroup[] {
   const h = headerMap(table);
   const groups: ReportingGroup[] = [];
   const seen = new Set<string>();
-  for (const row of table.getRangeBetweenHeaderAndTotal().getValues()) {
+  const values = table.getRangeBetweenHeaderAndTotal().getValues();
+  for (const row of values) {
     const id = text(row[h.ReportingGroupID]);
     if (!id) continue;
     if (seen.has(id)) throw new Error(`PUL-0302A-005: Duplicate ReportingGroupID ${id}.`);
@@ -251,7 +252,8 @@ function readRules(table: ExcelScript.Table): MappingRule[] {
 function buildHierarchy(classifications: ExcelScript.Table, products: ExcelScript.Table): ProductNode[] {
   const classificationById = new Map<string, { sourceSystemId: string; main: string; sub: string }>();
   const ch = headerMap(classifications);
-  for (const row of classifications.getRangeBetweenHeaderAndTotal().getValues()) {
+  const classificationValues = classifications.getRangeBetweenHeaderAndTotal().getValues();
+  for (const row of classificationValues) {
     classificationById.set(text(row[ch.SourceClassificationID]), {
       sourceSystemId: text(row[ch.SourceSystemID]),
       main: text(row[ch.SourceMainCategory]),
@@ -261,7 +263,8 @@ function buildHierarchy(classifications: ExcelScript.Table, products: ExcelScrip
   const result: ProductNode[] = [];
   const seen = new Set<string>();
   const ph = headerMap(products);
-  for (const row of products.getRangeBetweenHeaderAndTotal().getValues()) {
+  const productValues = products.getRangeBetweenHeaderAndTotal().getValues();
+  for (const row of productValues) {
     const productId = text(row[ph.ProductID]);
     if (!productId) continue;
     if (seen.has(productId)) throw new Error(`PUL-0302A-006: Duplicate ProductID ${productId}.`);
@@ -471,7 +474,8 @@ function readFacts(table: ExcelScript.Table): SourceFact[] {
   const h = headerMap(table);
   const facts: SourceFact[] = [];
   const seen = new Set<string>();
-  for (const row of table.getRangeBetweenHeaderAndTotal().getValues()) {
+  const values = table.getRangeBetweenHeaderAndTotal().getValues();
+  for (const row of values) {
     const salesFactId = text(row[h.SalesFactID]);
     if (!salesFactId) throw new Error("PUL-0302A-008: tblSalesFacts contains a blank SalesFactID.");
     if (seen.has(salesFactId)) throw new Error(`PUL-0302A-009: Duplicate SalesFactID ${salesFactId}.`);
@@ -535,12 +539,13 @@ function buildMetricBridge(
 }
 
 function writeMetricContract(workbook: ExcelScript.Workbook): void {
-  const sheet = resetOutputSheet(workbook, "Metric Contract", "tblMetricContract");
+  const sheet = resetOutputSheet(workbook, "Metric Contract", workbook.getTable("tblMetricContract"));
   writeTitle(
     sheet,
+    "Metric Contract",
     "Reporting Group Metric Contract",
     "Phase 2A deterministic contract only. Performance, Reports, _Metric_Calc, and KPI-0001 remain unchanged; Attach Rate is out of scope.",
-    "I"
+    9
   );
   const headers = [
     "MetricID", "DisplayName", "ValueType", "Numerator", "Denominator",
@@ -553,7 +558,7 @@ function writeMetricContract(workbook: ExcelScript.Workbook): void {
     ["METRIC-RPG-SALES-SHARE", "Reporting Group Sales Share", "Percentage", "Mapped Sales NOK for selected ReportingGroupID", "All Sales NOK in identical selected scope", "ImportID; optional ReportingChannel; optional RestaurantID; PublicationState", "Numerator = Mapped selected RPG; denominator = all states", "Contract + QA only", "Performance cutover is Phase 2B."],
     ["METRIC-RPG-QUANTITY-SHARE", "Reporting Group Quantity Share", "Percentage", "Mapped Quantity for selected ReportingGroupID", "All Quantity in identical selected scope", "ImportID; optional ReportingChannel; optional RestaurantID; PublicationState", "Numerator = Mapped selected RPG; denominator = all states", "Contract + QA only", "KPI exposure remains Draft/out of scope."]
   ];
-  addOutputTable(sheet, 4, headers, rows, "tblMetricContract", "TableStyleMedium2");
+  addOutputTable(sheet, "Metric Contract", 4, headers, rows, "tblMetricContract", "TableStyleMedium2");
   sheet.getFreezePanes().freezeRows(4);
   setWidths(sheet, [180, 190, 100, 270, 260, 310, 310, 165, 260]);
 }
@@ -569,31 +574,35 @@ function ensureLegacyEquivalenceTable(
     if (used) used.clear(ExcelScript.ClearApplyTo.all);
     writeTitle(
       sheet,
+      "Metric Equivalence",
       "Legacy CAT to Reporting Group Equivalence",
       "Human-authored ID-to-ID comparison definitions. Repeat DefinitionID for multiple CAT members. Pulse never infers equivalence from names.",
-      "H"
+      8
     );
-    sheet.getRange("A3:H3").setValues([[
+    checkedRangeByIndexes(sheet, "Metric Equivalence", 2, 0, 1, 8, "equivalence headers").setValues([[
       "DefinitionID", "ReportingGroupID", "LegacyReportingCategoryID", "ComparisonStatus",
       "Active", "Notes", "ApprovedBy", "ApprovedAt"
     ]]);
-    table = sheet.addTable("A3:H3", true);
+    table = sheet.addTable(
+      checkedRangeByIndexes(sheet, "Metric Equivalence", 2, 0, 1, 8, "equivalence table"),
+      true
+    );
     table.setName("tblLegacyRPGEquivalence");
     table.setPredefinedTableStyle("TableStyleMedium4");
-    sheet.getRange("D4:D1000").getDataValidation().setRule({
+    checkedRangeByIndexes(sheet, "Metric Equivalence", 3, 3, 997, 1, "ComparisonStatus validation").getDataValidation().setRule({
       list: { inCellDropDown: true, source: "Equivalent,Partial,Not Comparable" }
     });
-    sheet.getRange("E4:E1000").getDataValidation().setRule({
+    checkedRangeByIndexes(sheet, "Metric Equivalence", 3, 4, 997, 1, "Active validation").getDataValidation().setRule({
       list: { inCellDropDown: true, source: "Yes,No" }
     });
     const groupIds = groups.map(group => group.id);
     if (groupIds.length && groupIds.join(",").length <= 255) {
-      sheet.getRange("B4:B1000").getDataValidation().setRule({
+      checkedRangeByIndexes(sheet, "Metric Equivalence", 3, 1, 997, 1, "ReportingGroupID validation").getDataValidation().setRule({
         list: { inCellDropDown: true, source: groupIds.join(",") }
       });
     }
-    sheet.getRange("A4:H1000").getFormat().getFill().setColor("#FFFDF5");
-    sheet.getRange("H4:H1000").setNumberFormatLocal("dd.mm.yyyy hh:mm");
+    checkedRangeByIndexes(sheet, "Metric Equivalence", 3, 0, 997, 8, "editable definition area").getFormat().getFill().setColor("#FFFDF5");
+    checkedRangeByIndexes(sheet, "Metric Equivalence", 3, 7, 997, 1, "ApprovedAt format").setNumberFormatLocal("dd.mm.yyyy hh:mm");
     sheet.getFreezePanes().freezeRows(3);
     setWidths(sheet, [135, 145, 175, 135, 70, 280, 130, 130]);
   }
@@ -660,12 +669,13 @@ function readLegacyCategoryIds(table: ExcelScript.Table): string[] {
 }
 
 function writeMetricBridge(workbook: ExcelScript.Workbook, rows: MetricFact[]): void {
-  const sheet = resetOutputSheet(workbook, "_Metric_RPG_Facts", "tblMetricRPGFacts");
+  const sheet = resetOutputSheet(workbook, "_Metric_RPG_Facts", workbook.getTable("tblMetricRPGFacts"));
   writeTitle(
     sheet,
+    "_Metric_RPG_Facts",
     "Reporting Group Metric Facts",
     "Derived analysis bridge. One row per immutable sales fact joined to the current Effective Mapping state; never edit this table manually.",
-    "T"
+    20
   );
   const headers = [
     "SalesFactID", "ImportID", "RestaurantID", "ProductID", "ReportingChannel",
@@ -681,12 +691,13 @@ function writeMetricBridge(workbook: ExcelScript.Workbook, rows: MetricFact[]): 
     row.resolutionSource, row.resolutionState, row.resolutionStatus, row.winningRuleId,
     row.mappingAsOfDate, row.mappingFingerprint, row.metricRefreshAt
   ]);
-  addOutputTable(sheet, 4, headers, values, "tblMetricRPGFacts", "TableStyleMedium2");
-  const endRow = Math.max(5, rows.length + 4);
-  sheet.getRange(`F5:G${endRow}`).setNumberFormatLocal("dd.mm.yyyy");
-  sheet.getRange(`I5:J${endRow}`).setNumberFormat("#,##0.00");
-  sheet.getRange(`R5:R${endRow}`).setNumberFormatLocal("dd.mm.yyyy");
-  sheet.getRange(`T5:T${endRow}`).setNumberFormatLocal("dd.mm.yyyy hh:mm");
+  addOutputTable(sheet, "_Metric_RPG_Facts", 4, headers, values, "tblMetricRPGFacts", "TableStyleMedium2");
+  if (rows.length) {
+    checkedRangeByIndexes(sheet, "_Metric_RPG_Facts", 4, 5, rows.length, 2, "PeriodStart/PeriodEnd format").setNumberFormatLocal("dd.mm.yyyy");
+    checkedRangeByIndexes(sheet, "_Metric_RPG_Facts", 4, 8, rows.length, 2, "Quantity/SalesAmount format").setNumberFormat("#,##0.00");
+    checkedRangeByIndexes(sheet, "_Metric_RPG_Facts", 4, 17, rows.length, 1, "MappingAsOfDate format").setNumberFormatLocal("dd.mm.yyyy");
+    checkedRangeByIndexes(sheet, "_Metric_RPG_Facts", 4, 19, rows.length, 1, "MetricRefreshAt format").setNumberFormatLocal("dd.mm.yyyy hh:mm");
+  }
   sheet.getFreezePanes().freezeRows(4);
   setWidths(sheet, [120, 120, 100, 105, 105, 90, 90, 115, 90, 105, 135, 145, 175, 130, 110, 110, 120, 105, 190, 130]);
 }
@@ -945,23 +956,24 @@ function writeMetricQA(
   const sheet = resetOutputSheet(
     workbook,
     "Metric Migration QA",
-    "tblMetricQA",
-    "tblMetricReconciliation",
-    "tblMetricReportingGroupTotals",
-    "tblLegacyRPGCrosswalk",
-    "tblLegacyRPGComparison"
+    workbook.getTable("tblMetricQA"),
+    workbook.getTable("tblMetricReconciliation"),
+    workbook.getTable("tblMetricReportingGroupTotals"),
+    workbook.getTable("tblLegacyRPGCrosswalk"),
+    workbook.getTable("tblLegacyRPGComparison")
   );
   writeTitle(
     sheet,
+    "Metric Migration QA",
     "Phase 2A Metric Migration QA",
     "Central fact, mapping-state, Reporting Group, and human-configured legacy-equivalence reconciliation. Performance remains unchanged.",
-    "AB"
+    28
   );
-  sheet.getRange("A3:F3").setValues([[
+  checkedRangeByIndexes(sheet, "Metric Migration QA", 2, 0, 1, 6, "QA mapping summary").setValues([[
     "MappingAsOfDate", asOfDate, "MappingFingerprint", mappingFingerprint, "MetricRefreshAt", refreshAt
   ]]);
-  sheet.getRange("B3").setNumberFormatLocal("dd.mm.yyyy");
-  sheet.getRange("F3").setNumberFormatLocal("dd.mm.yyyy hh:mm");
+  checkedRangeByIndexes(sheet, "Metric Migration QA", 2, 1, 1, 1, "QA MappingAsOfDate format").setNumberFormatLocal("dd.mm.yyyy");
+  checkedRangeByIndexes(sheet, "Metric Migration QA", 2, 5, 1, 1, "QA MetricRefreshAt format").setNumberFormatLocal("dd.mm.yyyy hh:mm");
 
   const factFailures = reconciliations.filter(row => row.factVariance !== 0 || row.stateFactVariance !== 0).length;
   const salesFailures = reconciliations.filter(row =>
@@ -987,7 +999,7 @@ function writeMetricQA(
     ["QA-0302A-10", "Legacy Performance path preserved", "PASS", 0, "_Metric_Calc, Performance, Reports, and KPI Registry were fingerprinted before/after and remained unchanged."],
     ["QA-0302A-11", "Source facts unchanged", "PASS", factSnapshot.fingerprint, "tblSalesFacts content fingerprint remained unchanged through bridge creation."]
   ];
-  addOutputTable(sheet, 5, ["CheckID", "Check", "Result", "Observed", "Explanation"], checks, "tblMetricQA", "TableStyleMedium2");
+  addOutputTable(sheet, "Metric Migration QA", 5, ["CheckID", "Check", "Result", "Observed", "Explanation"], checks, "tblMetricQA", "TableStyleMedium2");
 
   const reconciliationRows = reconciliations.map(row => {
     const mapped = row.coverage["Mapped"];
@@ -1007,7 +1019,7 @@ function writeMetricQA(
     ];
   });
   let row = 19;
-  addOutputTable(sheet, row, [
+  addOutputTable(sheet, "Metric Migration QA", row, [
     "PublicationScope", "ImportID", "ChannelScope",
     "SourceFactCount", "BridgeFactCount", "FactCountVariance",
     "SourceSalesNOK", "BridgeSalesNOK", "SalesVariance",
@@ -1024,7 +1036,7 @@ function writeMetricQA(
     value.publicationScope, value.importId, value.channel, value.groupId, value.groupName,
     value.factCount, value.sales, value.quantity
   ]);
-  addOutputTable(sheet, row, [
+  addOutputTable(sheet, "Metric Migration QA", row, [
     "PublicationScope", "ImportID", "ChannelScope", "ReportingGroupID",
     "ReportingGroupName", "FactCount", "SalesNOK", "Quantity"
   ], groupRows, "tblMetricReportingGroupTotals", "TableStyleMedium4");
@@ -1039,7 +1051,7 @@ function writeMetricQA(
     value.legacy.quantity, value.rpg.quantity, value.quantityVariance,
     value.legacySalesShare, value.rpgSalesShare, value.shareVariance, value.result
   ]);
-  addOutputTable(sheet, row, [
+  addOutputTable(sheet, "Metric Migration QA", row, [
     "DefinitionID", "ComparisonStatus", "PublicationScope", "ImportID", "ChannelScope",
     "ReportingGroupID", "LegacyReportingCategoryIDs",
     "ScopeFactCount", "ScopeSalesNOK", "ScopeQuantity",
@@ -1055,7 +1067,7 @@ function writeMetricQA(
     value.groupId, value.groupName, value.resolutionStatus,
     value.factCount, value.sales, value.quantity
   ]);
-  addOutputTable(sheet, row, [
+  addOutputTable(sheet, "Metric Migration QA", row, [
     "PublicationScope", "ImportID", "ChannelScope", "LegacyReportingCategoryID",
     "EffectiveReportingGroupID", "EffectiveReportingGroupName", "ResolutionStatus",
     "FactCount", "SalesNOK", "Quantity"
@@ -1134,20 +1146,38 @@ function snapshotTable(table: ExcelScript.Table): Snapshot {
 
 function snapshotProtectedSurfaces(workbook: ExcelScript.Workbook, kpiTable: ExcelScript.Table): string {
   const state = newHashState();
-  for (const name of ["_Metric_Calc", "Performance", "Reports"]) {
-    const sheet = requiredSheet(workbook, name);
-    const used = sheet.getUsedRange();
-    updateHash(state, name);
-    if (used) {
-      updateHash(state, used.getAddress());
-      updateHashMatrix(state, used.getValues());
-      updateHashMatrix(state, used.getFormulas());
-    }
-  }
+  const metricCalcUsed = requiredSheet(workbook, "_Metric_Calc").getUsedRange();
+  const performanceUsed = requiredSheet(workbook, "Performance").getUsedRange();
+  const reportsUsed = requiredSheet(workbook, "Reports").getUsedRange();
+  const metricCalcAddress = metricCalcUsed ? metricCalcUsed.getAddress() : "";
+  const metricCalcValues = metricCalcUsed ? metricCalcUsed.getValues() : [];
+  const metricCalcFormulas = metricCalcUsed ? metricCalcUsed.getFormulas() : [];
+  const performanceAddress = performanceUsed ? performanceUsed.getAddress() : "";
+  const performanceValues = performanceUsed ? performanceUsed.getValues() : [];
+  const performanceFormulas = performanceUsed ? performanceUsed.getFormulas() : [];
+  const reportsAddress = reportsUsed ? reportsUsed.getAddress() : "";
+  const reportsValues = reportsUsed ? reportsUsed.getValues() : [];
+  const reportsFormulas = reportsUsed ? reportsUsed.getFormulas() : [];
+  updateProtectedSnapshot(state, "_Metric_Calc", metricCalcAddress, metricCalcValues, metricCalcFormulas);
+  updateProtectedSnapshot(state, "Performance", performanceAddress, performanceValues, performanceFormulas);
+  updateProtectedSnapshot(state, "Reports", reportsAddress, reportsValues, reportsFormulas);
   updateHash(state, "tblKPIRegistry");
   updateHashMatrix(state, [kpiTable.getHeaderRowRange().getValues()[0]]);
   updateHashMatrix(state, kpiTable.getRangeBetweenHeaderAndTotal().getValues());
   return finishHash(state, "PROTECTED-");
+}
+
+function updateProtectedSnapshot(
+  state: HashState,
+  name: string,
+  address: string,
+  values: (string | number | boolean)[][],
+  formulas: (string | number | boolean)[][]
+): void {
+  updateHash(state, name);
+  updateHash(state, address);
+  updateHashMatrix(state, values);
+  updateHashMatrix(state, formulas);
 }
 
 function sameSnapshot(left: Snapshot, right: Snapshot): boolean {
@@ -1207,25 +1237,68 @@ function finishHash(state: HashState, prefix: string): string {
 
 function addOutputTable(
   sheet: ExcelScript.Worksheet,
+  sheetName: string,
   startRow: number,
   headers: string[],
   rows: (string | number | boolean)[][],
   tableName: string,
   style: string
 ): ExcelScript.Table {
-  const endColumn = columnName(headers.length);
-  sheet.getRange(`A${startRow}:${endColumn}${startRow}`).setValues([headers]);
+  if (!headers.length) throw new Error(`PUL-0302A-018: ${sheetName} ${tableName} has no headers.`);
+  const dataRowCount = rows.length;
+  validateOutputRows(rows, headers.length, sheetName, tableName);
+  const headerRange = checkedRangeByIndexes(
+    sheet,
+    sheetName,
+    startRow - 1,
+    0,
+    1,
+    headers.length,
+    `${tableName} header`
+  );
+  headerRange.setValues([headers]);
   const chunkSize = 2000;
   for (let offset = 0; offset < rows.length; offset += chunkSize) {
     const chunk = rows.slice(offset, Math.min(offset + chunkSize, rows.length));
-    sheet.getRangeByIndexes(startRow + offset, 0, chunk.length, headers.length).setValues(chunk);
+    checkedRangeByIndexes(
+      sheet,
+      sheetName,
+      startRow + offset,
+      0,
+      chunk.length,
+      headers.length,
+      `${tableName} data rows ${offset + 1}-${offset + chunk.length}`
+    ).setValues(chunk);
   }
-  const endRow = rows.length ? startRow + rows.length : startRow;
-  const table = sheet.addTable(`A${startRow}:${endColumn}${endRow}`, true);
+  const tableRange = checkedRangeByIndexes(
+    sheet,
+    sheetName,
+    startRow - 1,
+    0,
+    dataRowCount + 1,
+    headers.length,
+    `${tableName} table`
+  );
+  const table = sheet.addTable(tableRange, true);
   table.setName(tableName);
   table.setPredefinedTableStyle(style);
-  styleHeader(sheet.getRange(`A${startRow}:${endColumn}${startRow}`));
+  styleHeader(headerRange);
   return table;
+}
+
+function validateOutputRows(
+  rows: (string | number | boolean)[][],
+  expectedColumns: number,
+  sheetName: string,
+  tableName: string
+): void {
+  for (let index = 0; index < rows.length; index++) {
+    if (rows[index].length !== expectedColumns) {
+      throw new Error(
+        `PUL-0302A-019: ${sheetName} ${tableName} row ${index + 1} has ${rows[index].length} values; expected ${expectedColumns}.`
+      );
+    }
+  }
 }
 
 function columnName(count: number): string {
@@ -1237,6 +1310,57 @@ function columnName(count: number): string {
     value = Math.floor(value / 26);
   }
   return result;
+}
+
+function checkedRangeByIndexes(
+  sheet: ExcelScript.Worksheet,
+  sheetName: string,
+  startRow: number,
+  startColumn: number,
+  rowCount: number,
+  columnCount: number,
+  context: string
+): ExcelScript.Range {
+  const maxRows = 1048576;
+  const maxColumns = 16384;
+  const valid = Number.isInteger(startRow) && Number.isInteger(startColumn) &&
+    Number.isInteger(rowCount) && Number.isInteger(columnCount) &&
+    startRow >= 0 && startColumn >= 0 && rowCount > 0 && columnCount > 0 &&
+    startRow + rowCount <= maxRows && startColumn + columnCount <= maxColumns;
+  const address = valid
+    ? indexedAddress(startRow, startColumn, rowCount, columnCount)
+    : "[invalid geometry]";
+  if (!valid) {
+    throw new Error(
+      `PUL-0302A-020: Invalid worksheet range ${sheetName}!${address} for ${context}; ` +
+      `startRow=${startRow}, startColumn=${startColumn}, rowCount=${rowCount}, columnCount=${columnCount}.`
+    );
+  }
+  try {
+    return sheet.getRangeByIndexes(startRow, startColumn, rowCount, columnCount);
+  } catch (error) {
+    throw new Error(
+      `PUL-0302A-021: Worksheet range acquisition failed at ${sheetName}!${address} for ${context}. ${errorMessage(error)}`
+    );
+  }
+}
+
+function indexedAddress(
+  startRow: number,
+  startColumn: number,
+  rowCount: number,
+  columnCount: number
+): string {
+  const firstColumn = columnName(startColumn + 1);
+  const lastColumn = columnName(startColumn + columnCount);
+  const firstRow = startRow + 1;
+  const lastRow = startRow + rowCount;
+  return `${firstColumn}${firstRow}:${lastColumn}${lastRow}`;
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return text(error);
 }
 
 function isMappingState(value: string): boolean {
@@ -1258,10 +1382,9 @@ function mainNodeId(sourceSystemId: string, mainCategory: string): string {
 function resetOutputSheet(
   workbook: ExcelScript.Workbook,
   name: string,
-  ...tableNames: string[]
+  ...tables: (ExcelScript.Table | undefined)[]
 ): ExcelScript.Worksheet {
-  for (const tableName of tableNames) {
-    const table = workbook.getTable(tableName);
+  for (const table of tables) {
     if (table) table.delete();
   }
   const sheet = workbook.getWorksheet(name) ?? workbook.addWorksheet(name);
@@ -1291,20 +1414,23 @@ function headerMap(table: ExcelScript.Table): { [key: string]: number } {
 
 function writeTitle(
   sheet: ExcelScript.Worksheet,
+  sheetName: string,
   title: string,
   subtitle: string,
-  endColumn: string
+  columnCount: number
 ): void {
-  sheet.getRange(`A1:${endColumn}1`).getFormat().getFill().setColor("#172033");
-  sheet.getRange(`A1:${endColumn}1`).getFormat().getFont().setColor("#FFFFFF");
-  sheet.getRange(`A1:${endColumn}1`).getFormat().getFont().setBold(true);
-  sheet.getRange(`A1:${endColumn}1`).getFormat().getFont().setSize(18);
-  sheet.getRange("A1").setValue(title);
-  sheet.getRange(`A2:${endColumn}2`).getFormat().getFill().setColor("#EAF2FF");
-  sheet.getRange(`A2:${endColumn}2`).getFormat().setWrapText(true);
-  sheet.getRange("A2").setValue(subtitle);
-  sheet.getRange("1:1").getFormat().setRowHeight(32);
-  sheet.getRange("2:2").getFormat().setRowHeight(30);
+  const titleBand = checkedRangeByIndexes(sheet, sheetName, 0, 0, 1, columnCount, "title band");
+  const subtitleBand = checkedRangeByIndexes(sheet, sheetName, 1, 0, 1, columnCount, "subtitle band");
+  titleBand.getFormat().getFill().setColor("#172033");
+  titleBand.getFormat().getFont().setColor("#FFFFFF");
+  titleBand.getFormat().getFont().setBold(true);
+  titleBand.getFormat().getFont().setSize(18);
+  titleBand.getCell(0, 0).setValue(title);
+  subtitleBand.getFormat().getFill().setColor("#EAF2FF");
+  subtitleBand.getFormat().setWrapText(true);
+  subtitleBand.getCell(0, 0).setValue(subtitle);
+  titleBand.getFormat().setRowHeight(32);
+  subtitleBand.getFormat().setRowHeight(30);
 }
 
 function styleHeader(range: ExcelScript.Range): void {
@@ -1326,11 +1452,18 @@ function updateEnvironment(
   value: string,
   note: string
 ): void {
-  const rows = table.getRangeBetweenHeaderAndTotal().getValues();
+  const body = table.getRangeBetweenHeaderAndTotal();
+  const rows = body.getValues();
+  let matchingIndex = -1;
   for (let index = 0; index < rows.length; index++) {
-    if (text(rows[index][0]) !== key) continue;
-    table.getRangeBetweenHeaderAndTotal().getCell(index, 1).setValue(value);
-    table.getRangeBetweenHeaderAndTotal().getCell(index, 2).setValue(note);
+    if (text(rows[index][0]) === key) {
+      matchingIndex = index;
+      break;
+    }
+  }
+  if (matchingIndex >= 0) {
+    body.getCell(matchingIndex, 1).setValue(value);
+    body.getCell(matchingIndex, 2).setValue(note);
     return;
   }
   table.addRow(-1, [key, value, note]);
@@ -1345,7 +1478,8 @@ function appendBuildLog(
 
 function nextId(table: ExcelScript.Table, prefix: string, digits: number): string {
   let max = 0;
-  for (const row of table.getRangeBetweenHeaderAndTotal().getValues()) {
+  const values = table.getRangeBetweenHeaderAndTotal().getValues();
+  for (const row of values) {
     const match = text(row[0]).match(new RegExp(`^${prefix}-(\\d+)$`));
     if (match) max = Math.max(max, Number(match[1]));
   }

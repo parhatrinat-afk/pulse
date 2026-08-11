@@ -70,6 +70,14 @@ Run after applying Phase 1 and then Phase 2A to a copy of the validated
 - [ ] `node --test tests/*.test.mjs` passes.
 - [ ] `git diff --check` passes.
 - [ ] Phase 2A Office Script compiles and executes in Excel for the web.
+- [ ] The 18,086-row bridge completes without a `Worksheet.getRange`
+  `GeneralException`; if indexed range acquisition fails, the message identifies
+  the sheet, exact A1 equivalent, and output operation.
+- [ ] Excel does not report protected-surface workbook reads from inside the
+  fingerprint iteration.
+- [ ] After an intentionally interrupted/failed run, rerunning Phase 2A safely
+  replaces generated contract/bridge/QA output while preserving human-authored
+  equivalence rows.
 - [ ] Runtime is acceptable against the 18,086-row checkpoint.
 - [ ] New sheets are readable and tables have usable widths/filters.
 - [ ] A saved Phase 2A QA checkpoint is reviewed before Phase 2B begins.

@@ -28,6 +28,9 @@ All meaningful Pulse changes are recorded here.
   and human-authored ID-based equivalence comparisons.
 - Added deterministic fixtures and Office Scripts compatibility/regression
   checks.
+- Hardened Excel-for-web output range handling with bounded indexed ranges,
+  exact range diagnostics, output row-width checks, and batched protected-sheet
+  reads for the 18,086-row checkpoint.
 - Preserved `_Metric_Calc`, Performance, Reports, KPI Registry, KPI-0001, raw
   source data, and `_Sales_Facts` unchanged.
 
