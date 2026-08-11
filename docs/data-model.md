@@ -37,6 +37,21 @@ winning rule, Reporting Group, explicit versus inherited state, and status.
 Resolution is most-specific explicit mapping, otherwise nearest mapped ancestor,
 otherwise Unmapped.
 
+### Metric Reporting Group Fact
+A derived analytical row joining one immutable Sales Fact to its Product's
+current Effective Mapping. It preserves fact lineage and source measures while
+adding effective Reporting Group, resolver state, MappingAsOfDate, mapping
+fingerprint, and metric refresh timestamp. It is regenerated analysis state and
+must never replace or rewrite the Sales Fact.
+
+Build 0.3.0 deliberately applies the current mapping state to historical facts
+for analysis. Historical fact-date mapping versions are not defined.
+
+### Legacy CAT/RPG Equivalence Definition
+A human-authored ID-to-ID declaration used only for migration comparison. One
+definition may contain several legacy ReportingCategoryIDs but must target one
+ReportingGroupID. Display-name similarity is never authoritative equivalence.
+
 ### Remap Assistant
 A legacy 0.2.0 review surface retained during the migration. The Phase 1
 hierarchy workflow lives on `Mapping` and persists to `Mapping Rules`.

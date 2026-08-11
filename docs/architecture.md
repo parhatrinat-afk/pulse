@@ -26,8 +26,24 @@ Subcategory → Source Main Category, but those are adapter-exposed levels rathe
 than a permanent three-level platform limit. Inheritance is computed and does
 not copy parent rules into descendant rows.
 
-Performance integration is deliberately deferred: the validated 0.2.0 category
-metric path remains in place until Phase 2.
+## Phase 2A metric bridge
+
+Phase 2A joins immutable sales facts to the validated current Effective Mapping
+state by stable ProductID. It materializes one derived analysis row per fact,
+including effective Reporting Group, explicit resolver status, MappingAsOfDate,
+and a deterministic semantic mapping fingerprint.
+
+The materialized bridge is an engine-layer classification projection, not a
+second source of business facts. SalesAmount, Quantity, fact identity, import,
+restaurant, channel, publication state, and legacy ReportingCategoryID remain
+traceable to `tblSalesFacts` and reconcile exactly.
+
+Build 0.3.0 applies the current mapping state to historical facts for analysis.
+Fact-date mapping/versioning requires a future explicit architecture decision.
+
+Performance integration remains deliberately deferred: the validated 0.2.0
+category metric path stays in place through Phase 2A. Phase 2B will migrate the
+central calculation and presentation path without redesigning Performance.
 
 ## Layers
 

@@ -8,7 +8,10 @@ Pulse is an operational performance and reporting platform designed to turn trus
 **Active development:** Build 0.3.0 — Mapping + Reporting Groups
 
 The Phase 1 foundation passed live Excel-for-web migration and behavioral QA on
-2026-08-11. Metric and Performance integration remain later phases; 0.2.0-QA is
+2026-08-11. Phase 2A now implements the Reporting Group metric contract,
+derived fact bridge, mapping-state reconciliation, and legacy comparison source
+path. Excel runtime QA remains required. `_Metric_Calc`, Performance, Reports,
+and KPI-0001 remain on the validated 0.2.0 path until Phase 2B. Build 0.2.0-QA is
 still the validated release checkpoint.
 
 The Excel workbook is currently the user-facing product. The repository is the source of truth for product rules, metric logic, tests, documentation, Office Scripts, and reproducible build assets.
