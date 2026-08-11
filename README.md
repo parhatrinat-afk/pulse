@@ -7,6 +7,10 @@ Pulse is an operational performance and reporting platform designed to turn trus
 **Current validated checkpoint:** Build 0.2.0-QA  
 **Active development:** Build 0.3.0 — Mapping + Reporting Groups
 
+The Phase 1 foundation is implemented on the development branch and awaits an
+Excel-for-web migration run and human workbook review. Metric and Performance
+integration remain later phases; 0.2.0-QA is still the validated checkpoint.
+
 The Excel workbook is currently the user-facing product. The repository is the source of truth for product rules, metric logic, tests, documentation, Office Scripts, and reproducible build assets.
 
 Build 0.3.0 introduces the semantic layer between source-system classifications and reporting:

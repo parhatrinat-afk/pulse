@@ -32,11 +32,10 @@ Build the semantic layer that sits between source-system structure and business 
 ### Build sequencing
 
 1. **Phase 1 — semantic model and hierarchical mapping foundation**
-   - Reporting Group registry.
-   - Hierarchy-aware mapping rules/resolution.
-   - Mapping administration/browse surface.
-   - Explicit vs inherited mapping visibility.
-   - Unmapped visibility and QA.
+   - Implemented on the development branch: Reporting Group registry,
+     hierarchy-aware rules/resolution, browse/action surface, explicit versus
+     inherited visibility, and mapping QA.
+   - Requires Excel-for-web execution and human workbook review before merge.
 
 2. **Phase 2 — metric integration**
    - Metrics consume resolved Reporting Groups.
