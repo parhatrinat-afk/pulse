@@ -102,17 +102,32 @@ Mappings must reference `ReportingGroupID`, not display text. Renaming `Reportin
 
 ## 5. Mapping model
 
-### Supported mapping scopes in 0.3.0
+### Generic hierarchy model
 
-1. Source Main Category
-2. Source Subcategory
-3. Product
+The Mapping experience follows the validated Lovable-style concept: users browse the actual hierarchy supplied by the source/POS, understand the descendants beneath a node, map at the highest safe level, and add more-specific exceptions only where needed.
 
-This matches the hierarchy already present in the source data and gives the user a practical high-level mapping path with product exceptions.
+The architecture is hierarchy-based. It must not be permanently defined as exactly three fixed levels.
 
-### Deterministic precedence
+The currently observed Katria hierarchy is:
 
-`Product override > Source Subcategory mapping > Source Main Category mapping > Unmapped`
+`Source Main Category -> Source Subcategory -> Product`
+
+Build 0.3.0 may therefore author rules at Main Category, Subcategory, or Product level for Katria. These are the currently supported rule targets, not the permanent definition of Pulse's mapping architecture. Future adapters may expose additional or differently named hierarchy levels without requiring a redesign of Reporting Groups, mapping semantics, or metrics.
+
+### Inheritance and deterministic precedence
+
+The general resolution rule is:
+
+**The most-specific applicable explicit mapping wins; otherwise inherit the nearest mapped ancestor; otherwise remain Unmapped.**
+
+For the current Katria hierarchy, that resolves as:
+
+1. Active Product mapping/override
+2. Active Source Subcategory mapping
+3. Active Source Main Category mapping
+4. Unmapped / needs review
+
+A higher-level mapping exists only when a human explicitly authors it. Descendants inherit that mapping automatically unless a more-specific explicit mapping applies. Inheritance is computed state, not a copied rule per descendant.
 
 Examples:
 
@@ -121,13 +136,23 @@ Examples:
 - Override an individual mocktail product to `Non-Alcohol` when it lives inside a campaign/welcome-drinks subcategory.
 - Override `Drink Mix` products to `Spirits/Cocktails` even if the source structure makes them appear non-alcoholic.
 
+A product override may intentionally differ from its inherited parent mapping. It must survive later remapping of any ancestor. Clearing or deactivating the override restores resolution from the nearest valid mapped ancestor.
+
+The administration and audit surfaces must distinguish:
+
+- explicit mapping authored on the current node;
+- inherited mapping and the ancestor rule it came from;
+- a more-specific descendant exception;
+- Unmapped state;
+- conflict or inactive-target state.
+
 ### Explicit human control
 
 No automatic fuzzy classification belongs in the deterministic resolver.
 
-The product may later suggest mappings, but a suggestion must be accepted by a human before it becomes an authoritative rule.
+The product may later suggest mappings, but a suggestion must be accepted by a human before it becomes an authoritative rule. Text similarity, names, or sales context must never silently create an effective mapping.
 
-### Effective dates
+### Effective dates and conflicts
 
 Retain effective-date capability already present in Remap Rules.
 
@@ -135,8 +160,9 @@ For any date-aware resolution:
 
 - an active rule applies only inside its effective interval;
 - blank end date means open-ended;
-- two overlapping active rules for the same scope object at the same precedence are a validation conflict;
-- conflicting rules must not be silently resolved by row order.
+- two overlapping active rules for the same source node/scope at the same hierarchy level are a validation conflict;
+- conflicting rules must not be silently resolved by row order;
+- precedence across different hierarchy levels remains most-specific applicable explicit rule first.
 
 ## 6. Recommended workbook migration
 
