@@ -124,12 +124,13 @@ Phase 2A does not add mandatory channel selectors to Performance.
 
 ## Mapping fingerprint
 
-The semantic v1 fingerprint is deterministic and row-order independent. It
+The semantic v2 fingerprint is deterministic and row-order independent. It
 includes:
 
 - mapping `AsOfDate`;
 - Reporting Group IDs, names, active status, and sort order;
-- classification-affecting Mapping Rule fields;
+- classification-affecting Mapping Rule fields, including `RuleAction` so a
+  Product Map and Product Exclude never share a fingerprint;
 - Product IDs and hierarchy node identity;
 - recomputed effective resolution state.
 

@@ -2,7 +2,7 @@
   "build": "0.3.0-Phase2A",
   "mapping_semantics": "current mapping state applied to historical facts for analysis",
   "mapping_as_of_date": 46245,
-  "mapping_fingerprint": "MAP-422ef00a77328b9b",
+  "mapping_fingerprint": "MAP-184b4a5922c3d30a",
   "all_facts": {
     "fact_count": 7,
     "sales_nok": 1319,

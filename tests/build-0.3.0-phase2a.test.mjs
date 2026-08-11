@@ -144,6 +144,66 @@ test("derived bridge accounts for every source fact and preserves lineage", () =
   ]));
 });
 
+test("explicit exclusions stay Unmapped, retain lineage, and remain in denominators", () => {
+  const exclusionRule = {
+    mappingRuleId: "MAP-EXCLUDE",
+    sourceSystemId: "SRC-1",
+    scopeType: "Product",
+    nodeId: "PRD-X",
+    ruleAction: "Exclude",
+    targetReportingGroupId: "",
+    effectiveFrom: 1,
+    effectiveTo: null,
+    status: "Active",
+  };
+  const exclusionProduct = {
+    productId: "PRD-X", sourceSystemId: "SRC-1", mainNodeId: "MAIN-X", subNodeId: "SUB-X",
+  };
+  const exclusionResolution = resolution(
+    "PRD-X", "", "", "Product", "Explicit exclusion", "Unmapped", "MAP-EXCLUDE", "MAIN-X", "SUB-X",
+    { productRuleIds: "MAP-EXCLUDE", productTargetIds: "" },
+  );
+  const exclusionFingerprint = computeMappingFingerprint({
+    asOfDate,
+    groups,
+    rules: [exclusionRule],
+    products: [exclusionProduct],
+    resolutions: [exclusionResolution],
+  });
+  assert.equal(computeMappingFingerprint({
+    asOfDate,
+    groups,
+    rules: [{ ...exclusionRule }],
+    products: [{ ...exclusionProduct }],
+    resolutions: [{ ...exclusionResolution }],
+  }), exclusionFingerprint);
+  assert.notEqual(computeMappingFingerprint({
+    asOfDate,
+    groups,
+    rules: [{ ...exclusionRule, ruleAction: "Map", targetReportingGroupId: "RPG-0001" }],
+    products: [exclusionProduct],
+    resolutions: [{ ...exclusionResolution, effectiveReportingGroupId: "RPG-0001", resolutionState: "Explicit", resolutionStatus: "Mapped" }],
+  }), exclusionFingerprint);
+
+  const sourceFacts = [fact("F-X", "IMP-X", "PRD-X", "CAT-X", "In-house", 7, 125)];
+  const exclusionBridge = buildMetricBridge({
+    facts: sourceFacts,
+    effectiveMappings: [{ ...exclusionResolution, asOfDate }],
+    mappingAsOfDate: asOfDate,
+    mappingFingerprint: exclusionFingerprint,
+    metricRefreshAt: 46245.5,
+  });
+  assert.equal(exclusionBridge[0].resolutionStatus, "Unmapped");
+  assert.equal(exclusionBridge[0].winningRuleId, "MAP-EXCLUDE");
+  const reconciliation = reconcileFactsAndBridge({
+    facts: sourceFacts,
+    bridge: exclusionBridge,
+    scopes: [{ publicationState: "Active Finalized", importId: "IMP-X", channel: "All channels" }],
+  })[0];
+  assert.equal(reconciliation.result, "PASS");
+  assert.deepEqual(reconciliation.coverage.Unmapped, { factCount: 1, salesNok: 125, quantity: 7 });
+});
+
 test("derived bridge rejects missing or unsupported Effective Mapping membership", () => {
   assert.throws(() => buildMetricBridge({
     facts,
@@ -272,6 +332,9 @@ test("Phase 2A Office Script preserves legacy metric surfaces and guards freshne
   assert.match(script, /_Metric_Calc, Performance, Reports, or KPI Registry changed during Phase 2A/);
   assert.match(script, /"MappingAsOfDate", "MappingFingerprint", "MetricRefreshAt"/);
   assert.match(script, /"Mapped", "Unmapped", "Conflict", "Inactive Target"/);
+  assert.match(script, /PULSE-MAPPING-SEMANTIC-V2/);
+  assert.match(script, /resolutionState: "Explicit exclusion"/);
+  assert.match(script, /rule\.ruleAction, rule\.targetGroupId/);
 });
 
 test("Phase 2A Office Script avoids unsupported Map and Set iterator constructs", () => {

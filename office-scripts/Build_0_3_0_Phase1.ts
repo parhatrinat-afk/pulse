@@ -64,7 +64,7 @@ function main(workbook: ExcelScript.Workbook): string {
 type ReportingGroup = { id: string; name: string; active: string; sortOrder: number };
 type MappingRule = {
   id: string; sourceSystemId: string; scopeType: string; nodeId: string;
-  nodeDisplay: string; hierarchyLevel: number; targetGroupId: string;
+  nodeDisplay: string; hierarchyLevel: number; targetGroupId: string; ruleAction: string;
   effectiveFrom: number; effectiveTo: number; status: string; createdAt: number; notes: string;
 };
 type ProductNode = {
@@ -125,21 +125,31 @@ function ensureMappingRules(workbook: ExcelScript.Workbook): ExcelScript.Table {
   const sheet = workbook.getWorksheet("Mapping Rules") ?? workbook.addWorksheet("Mapping Rules");
   let table = workbook.getTable("tblMappingRules");
   if (!table) {
-    sheet.getRange("A1:L20").clear(ExcelScript.ClearApplyTo.all);
-    writeTitle(sheet, "Mapping Rules", "Authoritative explicit rules. Use the Mapping browse/action surface; descendants inherit computed state.", "L");
-    sheet.getRange("A4:L4").setValues([[
+    sheet.getRange("A1:M20").clear(ExcelScript.ClearApplyTo.all);
+    writeTitle(sheet, "Mapping Rules", "Authoritative explicit rules. Product exclusions resolve to Unmapped; all other descendants inherit computed state.", "M");
+    sheet.getRange("A4:M4").setValues([[
       "MappingRuleID", "SourceSystemID", "ScopeType", "NodeID", "NodeDisplay", "HierarchyLevel",
-      "TargetReportingGroupID", "EffectiveFrom", "EffectiveTo", "Status", "CreatedAt", "Notes"
+      "TargetReportingGroupID", "EffectiveFrom", "EffectiveTo", "Status", "CreatedAt", "Notes", "RuleAction"
     ]]);
-    table = sheet.addTable("A4:L4", true);
+    table = sheet.addTable("A4:M4", true);
     table.setName("tblMappingRules");
     table.setPredefinedTableStyle("TableStyleMedium2");
     table.getRangeBetweenHeaderAndTotal().clear(ExcelScript.ClearApplyTo.contents);
     sheet.getRange("H5:I1000").setNumberFormatLocal("dd.mm.yyyy");
     sheet.getRange("K5:K1000").setNumberFormatLocal("dd.mm.yyyy hh:mm");
     sheet.getFreezePanes().freezeRows(4);
-    setWidths(sheet, [105, 110, 130, 210, 210, 85, 145, 100, 100, 85, 120, 240]);
+    setWidths(sheet, [105, 110, 130, 210, 210, 85, 145, 100, 100, 85, 120, 240, 90]);
+  } else if (headerMap(table).RuleAction === undefined) {
+    table.addColumn(-1, undefined, "RuleAction");
   }
+  const ruleHeaders = headerMap(table);
+  const ruleValues = table.getRangeBetweenHeaderAndTotal().getValues();
+  const actionRange = table.getColumn("RuleAction").getRangeBetweenHeaderAndTotal();
+  const actionValues = actionRange.getValues();
+  for (let i = 0; i < actionValues.length; i++) {
+    if (text(ruleValues[i][ruleHeaders.MappingRuleID]) && !text(actionValues[i][0])) actionValues[i][0] = "Map";
+  }
+  if (actionValues.length) actionRange.setValues(actionValues);
   return table;
 }
 
@@ -188,7 +198,7 @@ function applyPendingAction(
   if (!nodeDisplay) throw new Error(`PUL-0301-007: NodeID does not exist for ${scopeType}: ${nodeId}.`);
   table.addRow(-1, [
     nextId(table, "MAP", 6), sourceSystemId, scopeType, nodeId, nodeDisplay, levelByScope[scopeType],
-    targetGroupId, effectiveFrom, effectiveTo || "", "Active", excelNow(), notes
+    targetGroupId, effectiveFrom, effectiveTo || "", "Active", excelNow(), notes, "Map"
   ]);
   sheet.getRange("B5:B12").clear(ExcelScript.ClearApplyTo.contents);
   return `Applied explicit ${scopeType} rule for ${nodeDisplay}.`;
@@ -244,12 +254,27 @@ function buildHierarchy(classifications: ExcelScript.Table, products: ExcelScrip
 
 function readRules(table: ExcelScript.Table): MappingRule[] {
   const h = headerMap(table);
-  return table.getRangeBetweenHeaderAndTotal().getValues().filter(row => text(row[h.MappingRuleID])).map(row => ({
+  const rules = table.getRangeBetweenHeaderAndTotal().getValues().filter(row => text(row[h.MappingRuleID])).map(row => ({
     id: text(row[h.MappingRuleID]), sourceSystemId: text(row[h.SourceSystemID]), scopeType: text(row[h.ScopeType]),
     nodeId: text(row[h.NodeID]), nodeDisplay: text(row[h.NodeDisplay]), hierarchyLevel: numberValue(row[h.HierarchyLevel]),
     targetGroupId: text(row[h.TargetReportingGroupID]), effectiveFrom: numberValue(row[h.EffectiveFrom]),
-    effectiveTo: numberValue(row[h.EffectiveTo]), status: text(row[h.Status]), createdAt: numberValue(row[h.CreatedAt]), notes: text(row[h.Notes])
+    effectiveTo: numberValue(row[h.EffectiveTo]), status: text(row[h.Status]), createdAt: numberValue(row[h.CreatedAt]),
+    notes: text(row[h.Notes]), ruleAction: text(row[h.RuleAction]) || "Map"
   }));
+  for (const rule of rules) validateRuleAction(rule);
+  return rules;
+}
+
+function validateRuleAction(rule: MappingRule): void {
+  if (rule.ruleAction !== "Map" && rule.ruleAction !== "Exclude") {
+    throw new Error(`PUL-0301-014: Rule ${rule.id} has unsupported RuleAction ${rule.ruleAction}.`);
+  }
+  if (rule.ruleAction === "Exclude" && (rule.scopeType !== "Product" || !!rule.targetGroupId)) {
+    throw new Error(`PUL-0301-015: Rule ${rule.id} must be a Product exclusion with a blank Reporting Group target.`);
+  }
+  if (rule.ruleAction === "Map" && !rule.targetGroupId) {
+    throw new Error(`PUL-0301-016: Map rule ${rule.id} requires a Reporting Group target.`);
+  }
 }
 
 function findConflicts(rules: MappingRule[]): Conflict[] {
@@ -295,7 +320,12 @@ function resolveProduct(
         resolutionState: "Explicit conflict", resolutionStatus: "Conflict", winningRuleId: ids(candidates) };
     }
     if (candidates.length === 1) {
-      const rule = candidates[0]; const group = groups.get(rule.targetGroupId);
+      const rule = candidates[0];
+      if (rule.ruleAction === "Exclude") {
+        return { ...base, effectiveGroupId: "", effectiveGroupName: "", resolutionSource: "Product",
+          resolutionState: "Explicit exclusion", resolutionStatus: "Unmapped", winningRuleId: rule.id };
+      }
+      const group = groups.get(rule.targetGroupId);
       return { ...base, effectiveGroupId: rule.targetGroupId, effectiveGroupName: group?.name ?? "",
         resolutionSource: scopeType, resolutionState: scopeType === "Product" ? "Explicit" : "Inherited",
         resolutionStatus: !group || group.active !== "Yes" ? "Inactive Target" : "Mapped", winningRuleId: rule.id };
@@ -380,12 +410,13 @@ function writeMappingSurface(
 
 function writeMappingLists(workbook: ExcelScript.Workbook, groups: ReportingGroup[]): void {
   const sheet = workbook.getWorksheet("_Mapping_Lists") ?? workbook.addWorksheet("_Mapping_Lists");
-  sheet.getRange("A1:D1000").clear(ExcelScript.ClearApplyTo.all);
-  sheet.getRange("A1:D1").setValues([["ActiveReportingGroupID", "ScopeType", "Action", "Status"]]); styleHeader(sheet.getRange("A1:D1"));
+  sheet.getRange("A1:E1000").clear(ExcelScript.ClearApplyTo.all);
+  sheet.getRange("A1:E1").setValues([["ActiveReportingGroupID", "ScopeType", "Action", "Status", "RuleAction"]]); styleHeader(sheet.getRange("A1:E1"));
   const active = groups.filter(g=>g.active==="Yes").sort((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name));
   if(active.length) sheet.getRange(`A2:A${active.length+1}`).setValues(active.map(g=>[g.id]));
   sheet.getRange("B2:B4").setValues([["SourceMainCategory"],["SourceSubCategory"],["Product"]]);
   sheet.getRange("C2:C3").setValues([["Apply"],["Deactivate"]]); sheet.getRange("D2:D3").setValues([["Active"],["Inactive"]]);
+  sheet.getRange("E2:E3").setValues([["Map"],["Exclude"]]);
 }
 
 function wireMappingValidation(workbook: ExcelScript.Workbook): string {
@@ -397,6 +428,7 @@ function wireMappingValidation(workbook: ExcelScript.Workbook): string {
   const scopeSource = listsSheet.getRange("B2:B4");
   const activeGroupSource = listsSheet.getRange(`A2:A${Math.max(2,groupCount+1)}`);
   const statusSource = listsSheet.getRange("D2:D3");
+  const ruleActionSource = listsSheet.getRange("E2:E3");
   const failures: string[] = [];
   applyListValidation(sheet.getRange("B5"),actionSource,"Mapping!B5 Action",failures);
   applyListValidation(sheet.getRange("B7"),scopeSource,"Mapping!B7 ScopeType",failures);
@@ -404,9 +436,10 @@ function wireMappingValidation(workbook: ExcelScript.Workbook): string {
   applyListValidation(rulesSheet.getRange("C5:C1000"),scopeSource,"Mapping Rules!C5:C1000 ScopeType",failures);
   applyListValidation(rulesSheet.getRange("G5:G1000"),activeGroupSource,"Mapping Rules!G5:G1000 TargetReportingGroupID",failures);
   applyListValidation(rulesSheet.getRange("J5:J1000"),statusSource,"Mapping Rules!J5:J1000 Status",failures);
+  applyListValidation(rulesSheet.getRange("M5:M1000"),ruleActionSource,"Mapping Rules!M5:M1000 RuleAction",failures);
   const message = failures.length
     ? `PUL-0301-013: ${failures.length} dropdown validation(s) unavailable; mapping refresh completed. ${failures.join(" | ")}`
-    : "Dropdown validation ready (6/6).";
+    : "Dropdown validation ready (7/7).";
   sheet.getRange("E8").setValue(message);
   const statusBand=sheet.getRange("E8:N8");
   statusBand.getFormat().getFill().setColor(failures.length?"#FCE8E6":"#E2F0D9");

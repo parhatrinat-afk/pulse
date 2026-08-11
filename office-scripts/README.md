@@ -14,6 +14,11 @@ Current scripts include:
   mapping state, adds reconciliation/coverage QA, and supports human-authored
   legacy CAT/RPG comparisons. It leaves `_Metric_Calc`, Performance, Reports,
   KPI Registry, and KPI-0001 unchanged.
+- `Migrate_Lovable_Mapping.ts` — idempotently applies the approved 129-rule
+  Lovable business-definition migration using stable Pulse node/product and
+  Reporting Group IDs. It reuses semantically identical active rules and adds
+  the eight approved Product exclusions without changing facts or metric
+  presentation.
 
 Build 0.3.0 scripts should preserve the existing workbook unless an explicit migration is required. They must not rewrite raw imported source data as part of mapping.
 

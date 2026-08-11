@@ -15,6 +15,11 @@ fixtures. Run the complete suite with:
 
 `node --test tests/*.test.mjs`
 
+The Lovable migration suite validates the frozen 129-decision contract,
+Product exclusion precedence/lineage/denominator behavior, migration
+idempotency and `MAP-000001` reuse, Office Scripts compatibility guards, and
+the accepted checkpoint reconciliation targets.
+
 For Build 0.3.0, tests should cover at minimum:
 
 - Reporting Group registry integrity.

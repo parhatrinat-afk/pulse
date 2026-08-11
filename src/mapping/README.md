@@ -8,3 +8,9 @@ Unmapped.”
 
 `hierarchical-resolver.mjs` is the pure deterministic fixture implementation.
 The workbook implementation is in `office-scripts/Build_0_3_0_Phase1.ts`.
+
+The narrow Lovable migration extension adds Product-scoped explicit exclusion:
+an active `Exclude` rule wins at Product specificity and resolves to Unmapped
+with rule lineage. `lovable-migration.mjs` contains the frozen 129-decision
+stable-ID contract and idempotent migration planner mirrored by
+`office-scripts/Migrate_Lovable_Mapping.ts`.

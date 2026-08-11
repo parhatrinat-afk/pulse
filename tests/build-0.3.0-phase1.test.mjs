@@ -76,6 +76,40 @@ test("inactive or cleared override restores ancestor", () => {
   assert.equal(resolveProduct({ product, groups, rules, asOf: 10 }).ruleId, "MAP-1");
 });
 
+test("explicit Product exclusion beats inherited parent mapping", () => {
+  const rules = [
+    rule("MAP-1", "SourceMainCategory", product.mainNodeId, "RPG-0001"),
+    rule("MAP-2", "Product", product.productId, "", { ruleAction: "Exclude" }),
+  ];
+  const result = resolveProduct({ product, groups, rules, asOf: 10 });
+  assert.deepEqual(result, {
+    effectiveReportingGroupId: "",
+    resolutionSource: "Product",
+    resolutionState: "Explicit exclusion",
+    resolutionStatus: "Unmapped",
+    ruleId: "MAP-2",
+  });
+});
+
+test("deactivating Product exclusion restores inherited mapping", () => {
+  const rules = [
+    rule("MAP-1", "SourceMainCategory", product.mainNodeId, "RPG-0001"),
+    rule("MAP-2", "Product", product.productId, "", { ruleAction: "Exclude", status: "Inactive" }),
+  ];
+  const result = resolveProduct({ product, groups, rules, asOf: 10 });
+  assert.equal(result.ruleId, "MAP-1");
+  assert.equal(result.resolutionStatus, "Mapped");
+});
+
+test("overlapping Product Map and Exclude rules surface a conflict", () => {
+  const rules = [
+    rule("MAP-1", "Product", product.productId, "RPG-0001"),
+    rule("MAP-2", "Product", product.productId, "", { ruleAction: "Exclude" }),
+  ];
+  assert.deepEqual(findRuleConflicts(rules), [["MAP-1", "MAP-2"]]);
+  assert.equal(resolveProduct({ product, groups, rules, asOf: 10 }).resolutionStatus, "Conflict");
+});
+
 test("unmapped remains visible", () => {
   assert.equal(resolveProduct({ product, groups, rules: [], asOf: 10 }).resolutionStatus, "Unmapped");
 });
@@ -125,15 +159,18 @@ test("Office Script list validation uses resilient literal value sources", () =>
   )?.[0] ?? "";
 
   assert.ok(validationBody, "wireMappingValidation function must exist");
-  assert.equal((validationBody.match(/applyListValidation\(/g) ?? []).length, 6);
+  assert.equal((validationBody.match(/applyListValidation\(/g) ?? []).length, 7);
   assert.equal((validationBody.match(/,activeGroupSource,/g) ?? []).length, 2);
-  assert.doesNotMatch(validationBody, /setRule\(\{list:\{[^}]*source:(?:actionSource|scopeSource|activeGroupSource|statusSource)/);
+  assert.doesNotMatch(validationBody, /setRule\(\{list:\{[^}]*source:(?:actionSource|scopeSource|activeGroupSource|statusSource|ruleActionSource)/);
   assert.match(script, /sourceRange\.getValues\(\)\.forEach/);
   assert.match(script, /const source=items\.join\(","\)/);
   assert.match(script, /validation\.setRule\(\{list:\{inCellDropDown:true,source:source\}\}\)/);
   assert.match(script, /catch\(error\)\{failures\.push/);
   assert.match(validationBody, /PUL-0301-013/);
   assert.match(validationBody, /sheet\.getRange\("E8"\)\.setValue\(message\)/);
+  assert.match(script, /Dropdown validation ready \(7\/7\)/);
+  assert.match(script, /"RuleAction"/);
+  assert.match(script, /resolutionState: "Explicit exclusion", resolutionStatus: "Unmapped"/);
 });
 
 test("Office Script avoids unsupported Map and Set iterator constructs", () => {
