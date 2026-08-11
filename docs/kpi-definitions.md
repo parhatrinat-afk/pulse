@@ -67,6 +67,19 @@ Pulse presents the calculation and factual scope differences.
 
 Pulse does not decide whether a comparison is commercially appropriate and does not recommend an action.
 
+### Build 0.3.0 Phase 2A migration status
+
+Phase 2A adds the derived Reporting Group metric contract and reconciliation
+path but does not change KPI-0001, `_Metric_Calc`, Performance, or Reports.
+Category Sales Share remains the validated active presentation metric until the
+explicit Phase 2B cutover.
+
+The Phase 2A contract defines future Reporting Group Sales Share as mapped sales
+for a selected stable ReportingGroupID divided by all sales in the identical
+selected scope. Unmapped, Conflict, and Inactive Target facts remain in the
+denominator. This contract is validated in Phase 2A but is not yet the active
+Performance calculation.
+
 ## Planned KPIs
 
 - Category Quantity Share

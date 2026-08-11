@@ -14,10 +14,34 @@ All meaningful Pulse changes are recorded here.
 - Added overlap-conflict, inactive-target, unmapped, and reconciliation QA.
 - Preserved legacy Reporting Categories, Remap Rules, facts, and the 0.2.0 metric path.
 
+### Implemented in Phase 2A source
+
+- Added a deterministic Reporting Group metric contract without activating new
+  Performance behavior.
+- Added a materialized one-row-per-fact bridge from immutable sales facts to
+  current Effective Mapping.
+- Added current-date stale mapping rejection and a reproducible semantic mapping
+  fingerprint stored on every bridge row.
+- Added separate Mapped, Unmapped, Conflict, and Inactive Target reconciliation
+  for Sales NOK, Quantity, and fact count.
+- Added mapped Reporting Group totals, an explanatory legacy CAT/RPG crosswalk,
+  and human-authored ID-based equivalence comparisons.
+- Added deterministic fixtures and Office Scripts compatibility/regression
+  checks.
+- Hardened Excel-for-web output range handling with bounded indexed ranges,
+  exact range diagnostics, output row-width checks, and batched protected-sheet
+  reads for the 18,086-row checkpoint.
+- Completed live Excel-for-web Phase 2A QA on 2026-08-11: all source/bridge and
+  mapping-state reconciliations passed, legacy surfaces remained protected, and
+  the clean no-equivalence state returned the expected WARN.
+- Preserved `_Metric_Calc`, Performance, Reports, KPI Registry, KPI-0001, raw
+  source data, and `_Sales_Facts` unchanged.
+
 ### Still planned / later phases
 
-- Prepare Performance to consume Reporting Groups instead of exposing the full raw POS classification set.
-- Migrate metric membership and active Reporting Group selectors in Phase 2.
+- Migrate central metric membership and active Reporting Group selectors in
+  Phase 2B.
+- Cut Performance and Reports over without a visual redesign in Phase 2B.
 
 This section describes active development only. It does not advance the validated release checkpoint.
 

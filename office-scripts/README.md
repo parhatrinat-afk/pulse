@@ -9,6 +9,11 @@ Current scripts include:
 - `Build_0_3_0_Phase1.ts` — rerunnable Reporting Groups, hierarchy mapping,
   Effective Mapping, browse/action, and QA foundation. It intentionally leaves
   Performance and Reports on the 0.2.0 metric path.
+- `Build_0_3_0_Phase2A.ts` — validates current Effective Mapping, materializes
+  one Reporting Group analysis row per immutable sales fact, fingerprints the
+  mapping state, adds reconciliation/coverage QA, and supports human-authored
+  legacy CAT/RPG comparisons. It leaves `_Metric_Calc`, Performance, Reports,
+  KPI Registry, and KPI-0001 unchanged.
 
 Build 0.3.0 scripts should preserve the existing workbook unless an explicit migration is required. They must not rewrite raw imported source data as part of mapping.
 

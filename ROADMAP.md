@@ -37,15 +37,26 @@ Build the semantic layer that sits between source-system structure and business 
      inherited visibility, and mapping QA.
    - Passed live Excel-for-web migration and behavioral QA on 2026-08-11.
 
-2. **Phase 2 — metric integration**
-   - Metrics consume resolved Reporting Groups.
-   - Preserve deterministic current/comparison selection.
-   - Validate aggregation and reconciliation to raw sales facts.
+2. **Phase 2A — Reporting Group metric contract and bridge**
+   - Implemented in source: immutable fact-to-Effective-Mapping bridge,
+     current-state mapping fingerprint, stale-state rejection, explicit mapping
+     coverage, Reporting Group aggregation, and human-configured legacy CAT/RPG
+     side-by-side comparison.
+   - Preserve `_Metric_Calc`, Performance, Reports, and KPI-0001 on the legacy
+     path while Phase 2A receives live Excel QA.
 
-3. **Phase 3 — Performance integration**
-   - Active Reporting Groups become selectable/presentable.
-   - Performance no longer exposes raw POS classifications as the primary business view.
-   - Validate user experience using real uploaded reports before simplifying existing pages.
+3. **Phase 2B — metric and minimal Performance cutover**
+   - Central metrics consume resolved Reporting Groups.
+   - Preserve deterministic current/comparison selection and optional channel
+     scope.
+   - Active Reporting Groups become selectable/presentable without redesigning
+     Performance.
+   - Performance and Reports consume the same centralized metric result.
+
+4. **Phase 3 — Mapping/Performance UX and release QA**
+   - Refine Mapping and reporting usability using real uploaded reports.
+   - Complete release reconciliation, regression, and checkpoint QA.
+   - Simplify existing pages only when real-world validation supports it.
 
 ## Following sales-domain builds
 

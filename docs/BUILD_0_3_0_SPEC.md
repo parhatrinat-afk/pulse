@@ -373,12 +373,30 @@ Use staged implementation rather than one monolithic script.
 - add QA outputs/tests;
 - do not yet rewrite all Performance formulas.
 
-### Phase 2 — metric integration
+### Phase 2A — metric contract, bridge, and reconciliation
 
-- change metric membership from legacy ReportingCategoryID to EffectiveReportingGroupID;
+- define deterministic Reporting Group metric membership and denominator rules;
+- materialize one derived analysis row per immutable sales fact joined by
+  ProductID to current Effective Mapping;
+- apply current mapping state to historical facts for analysis without fact-date
+  versioning;
+- reject stale Effective Mapping before generating metric output;
+- store MappingAsOfDate and a deterministic semantic mapping fingerprint;
+- reconcile fact count, Sales NOK, and Quantity across Mapped, Unmapped,
+  Conflict, and Inactive Target states;
+- support only explicit human-authored legacy CAT/RPG equivalence definitions
+  and visible side-by-side variance;
+- preserve `_Metric_Calc`, Performance, Reports, KPI Registry, and KPI-0001 on
+  the validated legacy path.
+
+### Phase 2B — central calculation and minimal presentation cutover
+
+- change active metric membership from legacy ReportingCategoryID to
+  EffectiveReportingGroupID;
 - update selector helper lists to active Reporting Groups;
 - migrate Category Sales Share presentation to Reporting Group Sales Share;
-- keep current/comparison behavior.
+- keep current/comparison behavior and optional channel scope;
+- do not redesign Performance.
 
 ### Phase 3 — Mapping UX + release QA
 

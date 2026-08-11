@@ -1,0 +1,42 @@
+{
+  "build": "0.3.0-Phase2A",
+  "mapping_semantics": "current mapping state applied to historical facts for analysis",
+  "mapping_as_of_date": 46245,
+  "mapping_fingerprint": "MAP-422ef00a77328b9b",
+  "all_facts": {
+    "fact_count": 7,
+    "sales_nok": 1319,
+    "quantity": 26
+  },
+  "current_active_scope": {
+    "import_id": "IMP-CURRENT",
+    "channel": "All channels",
+    "fact_count": 5,
+    "sales_nok": 240,
+    "quantity": 15,
+    "states": {
+      "Mapped": { "fact_count": 2, "sales_nok": 150, "quantity": 3 },
+      "Unmapped": { "fact_count": 1, "sales_nok": 30, "quantity": 3 },
+      "Conflict": { "fact_count": 1, "sales_nok": 40, "quantity": 4 },
+      "Inactive Target": { "fact_count": 1, "sales_nok": 20, "quantity": 5 }
+    },
+    "reporting_groups": {
+      "RPG-0001": { "fact_count": 1, "sales_nok": 100, "quantity": 2 },
+      "RPG-0002": { "fact_count": 1, "sales_nok": 50, "quantity": 1 }
+    }
+  },
+  "legacy_comparisons": {
+    "LEGACY-EQ-001": {
+      "result": "PASS",
+      "legacy_sales_nok": 100,
+      "rpg_sales_nok": 100,
+      "sales_variance": 0
+    },
+    "LEGACY-EQ-002": {
+      "result": "VARIANCE",
+      "legacy_sales_nok": 90,
+      "rpg_sales_nok": 50,
+      "sales_variance": -40
+    }
+  }
+}
