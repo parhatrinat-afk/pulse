@@ -1,0 +1,79 @@
+{
+  "build": "0.3.0-Phase2B",
+  "metric_id": "KPI-0001",
+  "metric_name": "Reporting Group Sales Share",
+  "mapping_fingerprint": "MAP-342029f71a922b47",
+  "source": {
+    "fact_count": 18086,
+    "sales_nok": 426611113.82,
+    "quantity": 2069940.12
+  },
+  "states": {
+    "Mapped": { "fact_count": 15935, "sales_nok": 405493085.13, "quantity": 1925100.06 },
+    "Unmapped": { "fact_count": 2151, "sales_nok": 21118028.69, "quantity": 144840.06 },
+    "Conflict": { "fact_count": 0, "sales_nok": 0, "quantity": 0 },
+    "Inactive Target": { "fact_count": 0, "sales_nok": 0, "quantity": 0 }
+  },
+  "result_grain": {
+    "kpis": 1,
+    "datasets": 2,
+    "active_reporting_groups": 9,
+    "company_scopes": 1,
+    "restaurant_scopes": 16,
+    "expected_rows": 306
+  },
+  "performance_restaurant_scope": {
+    "configuration": "Status=Active AND ReportingEnabled=Yes",
+    "enabled_restaurants": 16,
+    "expected_rows_with_16": 306,
+    "expected_rows_with_15": 288,
+    "company_scope_fingerprint_prefix": "RSC-"
+  },
+  "datasets": {
+    "IMP-2025-BASELINE": {
+      "label": "2025 full year",
+      "fact_count": 14354,
+      "sales_nok": 417652171.82,
+      "quantity": 2023918.89,
+      "reporting_groups": {
+        "RPG-0001": { "name": "Add-ons", "fact_count": 1272, "sales_nok": 4543795.00, "quantity": 87000.17 },
+        "RPG-0002": { "name": "Non-Alcohol", "fact_count": 822, "sales_nok": 14754047.00, "quantity": 225852.50 },
+        "RPG-0003": { "name": "Spirits/Cocktails", "fact_count": 2038, "sales_nok": 12840631.00, "quantity": 74697.98 },
+        "RPG-0004": { "name": "Coffee & Tea", "fact_count": 668, "sales_nok": 3407724.00, "quantity": 49787.51 },
+        "RPG-0005": { "name": "Beer & Cider", "fact_count": 342, "sales_nok": 21646618.00, "quantity": 158184.97 },
+        "RPG-0006": { "name": "Desserts", "fact_count": 279, "sales_nok": 14215531.00, "quantity": 79465.39 },
+        "RPG-0007": { "name": "Wine & Sake", "fact_count": 1228, "sales_nok": 28318517.00, "quantity": 102564.61 },
+        "RPG-0008": { "name": "Starters", "fact_count": 1146, "sales_nok": 23344944.00, "quantity": 132250.40 },
+        "RPG-0009": { "name": "Mains", "fact_count": 4690, "sales_nok": 273823457.13, "quantity": 973890.97 }
+      },
+      "unmapped": { "fact_count": 1869, "sales_nok": 20756907.69, "quantity": 140224.39 }
+    },
+    "IMP-2026-W31": {
+      "label": "Week 31 2026",
+      "fact_count": 3732,
+      "sales_nok": 8958942.00,
+      "quantity": 46021.23,
+      "reporting_groups": {
+        "RPG-0001": { "name": "Add-ons", "fact_count": 360, "sales_nok": 131487.00, "quantity": 2256.83 },
+        "RPG-0002": { "name": "Non-Alcohol", "fact_count": 352, "sales_nok": 437014.00, "quantity": 6465.00 },
+        "RPG-0003": { "name": "Spirits/Cocktails", "fact_count": 276, "sales_nok": 203825.00, "quantity": 1303.34 },
+        "RPG-0004": { "name": "Coffee & Tea", "fact_count": 173, "sales_nok": 60552.00, "quantity": 928.00 },
+        "RPG-0005": { "name": "Beer & Cider", "fact_count": 119, "sales_nok": 488112.00, "quantity": 3284.50 },
+        "RPG-0006": { "name": "Desserts", "fact_count": 110, "sales_nok": 261205.00, "quantity": 1436.34 },
+        "RPG-0007": { "name": "Wine & Sake", "fact_count": 285, "sales_nok": 520925.00, "quantity": 1906.84 },
+        "RPG-0008": { "name": "Starters", "fact_count": 120, "sales_nok": 518761.00, "quantity": 3040.35 },
+        "RPG-0009": { "name": "Mains", "fact_count": 1655, "sales_nok": 5975940.00, "quantity": 20784.36 }
+      },
+      "unmapped": { "fact_count": 282, "sales_nok": 361121.00, "quantity": 4615.67 }
+    }
+  },
+  "default_add_ons": {
+    "current_import_id": "IMP-2026-W31",
+    "current_sales_nok": 131487.00,
+    "current_share": 0.014676621413555305,
+    "comparison_import_id": "IMP-2025-BASELINE",
+    "comparison_sales_nok": 4543795.00,
+    "comparison_share": 0.01087937596541048,
+    "change_percentage_points": 0.003797245448144825
+  }
+}

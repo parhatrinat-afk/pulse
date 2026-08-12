@@ -14,6 +14,13 @@ Current scripts include:
   mapping state, adds reconciliation/coverage QA, and supports human-authored
   legacy CAT/RPG comparisons. It leaves `_Metric_Calc`, Performance, Reports,
   KPI Registry, and KPI-0001 unchanged.
+- `Build_0_3_0_Phase2B.ts` — validates Phase 2A bridge freshness and one-to-one
+  source reconciliation before mutation, materializes centralized KPI-0001
+  Reporting Group results in `_Metric_Calc`, and cuts the existing Performance
+  and Reports presentation over without restoring mandatory channel UI or
+  redesigning the page. Active, ReportingEnabled RestaurantIDs define the
+  auditable Company scope; excluded restaurants remain untouched in source and
+  Phase 2A.
 - `Migrate_Lovable_Mapping.ts` — idempotently applies the approved 129-rule
   Lovable business-definition migration using stable Pulse node/product and
   Reporting Group IDs. It reuses semantically identical active rules and adds

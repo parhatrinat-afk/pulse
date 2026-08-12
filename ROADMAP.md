@@ -38,20 +38,23 @@ Build the semantic layer that sits between source-system structure and business 
    - Passed live Excel-for-web migration and behavioral QA on 2026-08-11.
 
 2. **Phase 2A — Reporting Group metric contract and bridge**
-   - Implemented in source: immutable fact-to-Effective-Mapping bridge,
+   - Implemented and live-Excel validated: immutable fact-to-Effective-Mapping bridge,
      current-state mapping fingerprint, stale-state rejection, explicit mapping
      coverage, Reporting Group aggregation, and human-configured legacy CAT/RPG
      side-by-side comparison.
-   - Preserve `_Metric_Calc`, Performance, Reports, and KPI-0001 on the legacy
-     path while Phase 2A receives live Excel QA.
+   - The accepted Lovable migration produces 15,935 Mapped and 2,151 Unmapped
+     facts with zero Conflict/Inactive Target rows.
 
 3. **Phase 2B — metric and minimal Performance cutover**
-   - Central metrics consume resolved Reporting Groups.
-   - Preserve deterministic current/comparison selection and optional channel
-     scope.
-   - Active Reporting Groups become selectable/presentable without redesigning
-     Performance.
+   - Implemented and live-Excel validated on 2026-08-12.
+   - Central KPI-0001 results consume the validated Phase 2A Reporting Group
+     bridge and are materialized in `_Metric_Calc`.
+   - Independent current/comparison datasets, all-channel behavior, company and
+     restaurant scopes, and the existing Performance design are preserved.
    - Performance and Reports consume the same centralized metric result.
+   - The shared active/ReportingEnabled restaurant scope passed a 16 → 15 → 16
+     restaurant round trip with deterministic cardinality and scope fingerprint
+     restoration.
 
 4. **Phase 3 — Mapping/Performance UX and release QA**
    - Refine Mapping and reporting usability using real uploaded reports.

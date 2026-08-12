@@ -65,7 +65,22 @@ hierarchy workflow lives on `Mapping` and persists to `Mapping Rules`.
 Central metadata describing a metric, its status, domain, formatting, supported views, and presentation behavior.
 
 ### Metric Result
-A deterministic calculated value derived from published facts for a defined scope, period, and KPI.
+A deterministic calculated value derived from the validated Reporting Group
+fact bridge for a defined KPI, dataset, Reporting Group, and organizational
+scope. Build 0.3.0 Phase 2B stores KPI-0001 results in
+`tblMetricRPGResults`. The result records numerator, full-scope denominator,
+metric value, mapping date/fingerprint, and calculation timestamp.
+
+Company results also record `RestaurantScopeFingerprint`, derived from the
+sorted RestaurantIDs where `Status=Active` and `ReportingEnabled=Yes`. This
+configuration defines the shared default Performance company scope without
+mutating or removing facts outside the scope. It is reusable scope metadata,
+not part of KPI-0001's metric definition.
+
+Company and restaurant results share one contract. Current/comparison is a
+presentation choice between independently materialized ImportIDs rather than a
+property of a result row. ChannelScope is explicitly All channels for the
+validated Phase 2B presentation.
 
 ## Import safety
 
