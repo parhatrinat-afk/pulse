@@ -1,6 +1,12 @@
-# Category Sales Share implementation
+# Category Sales Share implementation — legacy Build 0.2.0
 
-Implementation target: `KPI-0001`
+Historical implementation target: `KPI-0001`
+
+This document preserves the validated Build 0.2.0 CAT-based calculation for
+compatibility and regression analysis. Build 0.3.0 Phase 2B retains the stable
+KPI-0001 ID but activates Reporting Group Sales Share through
+`tblMetricRPGResults`; this legacy formula is no longer authoritative for
+Performance.
 
 The authoritative facts remain `tblSalesFacts`.
 

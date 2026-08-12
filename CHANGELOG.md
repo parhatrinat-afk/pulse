@@ -37,11 +37,47 @@ All meaningful Pulse changes are recorded here.
 - Preserved `_Metric_Calc`, Performance, Reports, KPI Registry, KPI-0001, raw
   source data, and `_Sales_Facts` unchanged.
 
+### Implemented and live validated in Phase 2B
+
+- Added a pre-mutation Phase 2B bridge preflight that verifies today's mapping
+  fingerprint, one bridge row per fact, complete lineage, Sales NOK, Quantity,
+  fact count, and four-state coverage.
+- Added deterministic centralized `tblMetricRPGResults` rows at the grain
+  KPI × dataset × Reporting Group × company/restaurant scope.
+- Migrated KPI-0001 to Reporting Group Sales Share while retaining its stable
+  KPI ID.
+- Replaced the active `_Metric_Calc` CAT helper with active Reporting Groups and
+  stable RPG IDs.
+- Migrated Performance formulas from direct legacy CAT `SUMIFS` to centralized
+  RPG result lookups, preserving independent current/comparison datasets,
+  all-channel behavior, and the restaurant breakdown.
+- Preserved Reports as a consumer of the same Performance result.
+- Added visible Metric Results QA, deterministic fixtures for all nine RPGs,
+  accepted Add-ons targets, and Office Scripts compatibility guards.
+- Preserved `_Sales_Facts`, `_Metric_RPG_Facts`, mapping configuration,
+  Effective Mapping, Lovable decisions, legacy CAT structures, and CAT/RPG
+  equivalence definitions.
+- Defined the Phase 2B Company scope as active, ReportingEnabled restaurants;
+  excluded restaurants affect neither numerator nor denominator while remaining
+  intact in Phase 2A reconciliation.
+- Established that enabled set as the shared default Performance scope contract,
+  consumed by KPI-0001 now and by future KPIs unless explicitly overridden by
+  an approved KPI definition; no future KPI was implemented.
+- Added deterministic Company restaurant-scope fingerprints, dynamic
+  306/288-row cardinality coverage, and enabled-plus-excluded scope
+  reconciliation for facts, Sales NOK, and Quantity.
+- Passed live Excel-for-web QA on 2026-08-12. Sixteen enabled restaurants
+  produced 306 rows and scope fingerprint `RSC-08df626f217dd94b`; deselecting
+  Swift produced 288 rows, excluded 764 facts / NOK 12,561,017.69 / Quantity
+  3,008 from Performance only, and re-enabling Swift restored the exact original
+  fingerprint, cardinality, and accepted Add-ons results.
+- All sixteen Metric Results QA checks passed throughout the restaurant-scope
+  round trip.
+
 ### Still planned / later phases
 
-- Migrate central metric membership and active Reporting Group selectors in
-  Phase 2B.
-- Cut Performance and Reports over without a visual redesign in Phase 2B.
+- Complete branch review and merge/release acceptance for Phase 2B.
+- Continue to Phase 3 only after Phase 2B acceptance.
 
 This section describes active development only. It does not advance the validated release checkpoint.
 

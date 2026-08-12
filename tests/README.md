@@ -20,6 +20,12 @@ Product exclusion precedence/lineage/denominator behavior, migration
 idempotency and `MAP-000001` reuse, Office Scripts compatibility guards, and
 the accepted checkpoint reconciliation targets.
 
+Phase 2B adds bridge-cutover freshness checks, deterministic centralized result
+IDs/grain, all-state denominator tests, independent nine-RPG dataset fixtures,
+accepted Add-ons targets, enabled/deselected restaurant scope reconciliation,
+dynamic 306/288 cardinality, Performance formula guards, Reports linkage, and
+Office Scripts compiler/performance compatibility checks.
+
 For Build 0.3.0, tests should cover at minimum:
 
 - Reporting Group registry integrity.
@@ -34,5 +40,7 @@ For Build 0.3.0, tests should cover at minimum:
 - Reproducible mapping fingerprints and stale Effective Mapping rejection.
 - Separate Mapped, Unmapped, Conflict, and Inactive Target coverage.
 - Human-configured ID-based CAT/RPG equivalence and visible variance.
+- Centralized KPI results consumed by Performance/Reports without direct legacy
+  CAT calculations.
 
 Tests should be deterministic, explainable, and tied to a reproducible build or workbook checkpoint.

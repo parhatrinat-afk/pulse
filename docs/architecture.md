@@ -47,9 +47,32 @@ traceable to `tblSalesFacts` and reconcile exactly.
 Build 0.3.0 applies the current mapping state to historical facts for analysis.
 Fact-date mapping/versioning requires a future explicit architecture decision.
 
-Performance integration remains deliberately deferred: the validated 0.2.0
-category metric path stays in place through Phase 2A. Phase 2B will migrate the
-central calculation and presentation path without redesigning Performance.
+## Phase 2B centralized metric result
+
+Phase 2B materializes KPI-0001 Reporting Group Sales Share in
+`tblMetricRPGResults` on `_Metric_Calc`. The grain separates MetricID, ImportID,
+ReportingGroupID, and company/restaurant scope. Performance reads the
+centralized result rather than calculating directly from legacy CAT membership,
+and Reports retains its linkage to the same Performance result.
+
+The active calculation path no longer depends on ReportingCategoryID or
+CAT/RPG equivalence. Legacy CAT structures and human-authored equivalence remain
+available only for compatibility and migration QA. Unmapped, Conflict, Inactive
+Target, and explicit-exclusion facts remain in every applicable denominator.
+
+### Shared Performance restaurant scope
+
+The authoritative default organizational scope for Performance is the current
+set of stable RestaurantIDs with `Status=Active` and `ReportingEnabled=Yes`.
+This is a shared Performance scope contract, not KPI-0001 business logic.
+KPI-0001 consumes it in Phase 2B, and future Performance KPIs must consume the
+same scope unless their approved definition explicitly documents a different
+organizational-scope requirement.
+
+Facts outside the enabled set remain fully reconciled in Phase 2A but enter
+neither the applicable Company numerator nor denominator. Company metric rows
+store a fingerprint of the sorted enabled RestaurantIDs so the materialized
+scope is auditable. This contract does not add or implement future KPIs.
 
 ## Layers
 
