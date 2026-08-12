@@ -31,6 +31,17 @@ scope uses the shared Performance restaurant set where `Status=Active` and
 `ReportingEnabled=Yes`. This scope is independent of metric identity and must
 be applied consistently to current and comparison results.
 
+Phase 2C lets the user interactively choose any subset inside that eligible set.
+The same selected RestaurantIDs apply to both the current and comparison
+components, while the two ImportIDs remain independently selectable. Changing
+selection or either dataset is Excel recalculation, not a metric refresh.
+The Performance Total column aggregates the currently selected Reporting
+Groups. PP Change and NOK Impact are recalculated from aggregate current and
+comparison components; they are not sums of displayed row percentages or
+impacts. Restaurant sorting is presentation-only and uses the same numeric
+selected-display helpers, so changing either dataset may change rank without
+changing component identity.
+
 ## Guardrail behavior
 
 Pulse may identify factual differences such as:

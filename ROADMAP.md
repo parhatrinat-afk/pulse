@@ -56,10 +56,40 @@ Build the semantic layer that sits between source-system structure and business 
      restaurant round trip with deterministic cardinality and scope fingerprint
      restoration.
 
-4. **Phase 3 — Mapping/Performance UX and release QA**
+4. **Phase 2C — interactive Sales Performance model**
+   - Implemented and live Excel accepted with 16/16 Interaction QA PASS.
+   - IA Slice 1 and Visual Slices 2A/2B establish the accepted clean functional
+     0.3.0 foundation; they are not the final Pulse UI.
+   - Adds formula-driven, stable-ID restaurant and Reporting Group Include state
+     over Phase 2B additive components.
+   - Preserves independent current/comparison datasets, a separate detail RPG,
+     weighted Grand Total, and Company QA/control rows.
+   - Adds a selected-RPG Total column and recalculation-only restaurant sorting
+     by Total or a displayed RPG, using full-precision numeric helpers.
+   - Adds a derived NOK Impact display using comparison share against the
+     current selected-scope sales base without introducing another metric engine.
+   - Normal exploration requires no Office Script and does not materialize
+     restaurant combinations.
+
+5. **Phase 3 — Mapping/Performance UX and release QA**
    - Refine Mapping and reporting usability using real uploaded reports.
    - Complete release reconciliation, regression, and checkpoint QA.
    - Simplify existing pages only when real-world validation supports it.
+   - Move toward a compact normal-user surface: Overview, Performance, Reports,
+     Imports/Refresh, and Mapping; keep Restaurants, Reporting Groups, Settings,
+     and KPI Registry as appropriate administration surfaces.
+   - Hide/protect engineering, QA, raw, helper, bridge, audit, legacy,
+     environment, metric, adapter, and staging sheets from normal users only
+     after advanced/admin troubleshooting access is designed and validated.
+   - Polish Performance visual hierarchy without changing the accepted Phase 2C
+     calculation model; strengthen Total/Grand Total hierarchy and selection
+     presentation.
+   - Evolve Overview into a live, minimal, clickable Pulse home screen and the
+     natural future location for the Pulse ♥ refresh workflow. Do not implement
+     that workflow before its architecture is approved.
+   - Evolve Reports into a meeting/export surface and Mapping toward the simple
+     needs-attention → choose Reporting Group → refresh experience while stable
+     IDs and rule lineage remain available underneath.
 
 ## Following sales-domain builds
 
@@ -69,7 +99,6 @@ After the Reporting Group foundation is proven:
 - Add-ons Attach Rate.
 - Percentage-point Change.
 - Sales NOK and Quantity views.
-- Estimated NOK Impact where the methodology is sufficiently defensible.
 - Trend and leaderboard views where appropriate.
 
 ## Parked until the sales foundation is proven

@@ -12,10 +12,25 @@ Excel-for-web QA. Phase 2B has also passed live Excel-for-web calculation,
 restaurant-scope, reconciliation, and rerun QA: it validates the Phase 2A
 bridge, materializes centralized Reporting Group Sales Share results in
 `_Metric_Calc`, and cuts the existing Performance/Reports path over without a
-visual redesign or mandatory channel selector. Build 0.2.0-QA remains the
+visual redesign or mandatory channel selector. Phase 2C and its bounded IA and
+visual slices are implemented and accepted in live Excel with all 16
+Interaction QA checks passing. The checkpoint adds formula-driven Yes/No
+restaurant and Reporting Group selection, selected-RPG Totals, numeric
+restaurant sorting, a weighted Grand Total, and five matrix views without
+requiring scripts during normal use. Build 0.2.0-QA remains the
 validated release checkpoint until Build 0.3.0 release acceptance.
 
 The Excel workbook is currently the user-facing product. The repository is the source of truth for product rules, metric logic, tests, documentation, Office Scripts, and reproducible build assets.
+
+## Canonical development workbook
+
+The single authoritative development workbook is
+`OneDrive/Pulse/Development/Pulse_Current.xlsx`. Normal development continues
+in that same workbook. Prefer its connected live Excel session for inspection
+and QA; if it cannot be accessed, stop and ask rather than searching other
+folders or substituting another copy. Create a separate workbook only when an
+explicit checkpoint or release copy is requested. GitHub remains the source of
+truth for code, scripts, tests, and documentation.
 
 Build 0.3.0 introduces the semantic layer between source-system classifications and reporting:
 

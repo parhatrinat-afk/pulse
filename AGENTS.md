@@ -111,6 +111,9 @@ Conflicting active rules at the same source node/scope and overlapping effective
 ## Workbook product rules
 
 - The workbook remains a user-facing product and a release artifact.
+- The single authoritative development workbook is `OneDrive/Pulse/Development/Pulse_Current.xlsx`.
+- Prefer the connected live Excel session for that canonical workbook. If it is unavailable, stop and ask the user; do not search Desktop, Downloads, or other folders for substitutes.
+- Continue normal development in the same canonical workbook. Do not create QA, test, copy, or downloaded workbook variants unless the user explicitly requests a checkpoint or release copy.
 - Preserve existing sheets/functions unless the active build specification explicitly migrates them.
 - Do not remove development/engine sheets merely for visual simplification.
 - Normal user-facing navigation remains goal-oriented: Overview -> Performance -> Reports -> Imports -> Settings.

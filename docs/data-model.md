@@ -82,6 +82,26 @@ presentation choice between independently materialized ImportIDs rather than a
 property of a result row. ChannelScope is explicitly All channels for the
 validated Phase 2B presentation.
 
+### Performance Interaction Selection
+
+Phase 2C stores user-facing Include state by stable RestaurantID and
+ReportingGroupID. It is presentation configuration, not a fact, Mapping Rule,
+metric result, or ReportingEnabled replacement. The selected scope is exactly
+the rows marked Yes. When every row is Yes the derived scope is All; otherwise
+it is a subset. Selection state is authoritative; All versus Custom is derived,
+not user-selected. Existing choices survive refresh by ID, while a newly
+eligible ID defaults to No after the catalog already exists.
+
+The interaction layer derives combined results from Phase 2B Restaurant-scope
+additive components. It does not add rows to `tblMetricRPGResults`; Company rows
+remain the control for the all-eligible scope.
+
+The Phase 2C Total and sorting surfaces are derived formula state only. Total
+stores selected-RPG current/comparison numerators, one denominator for each
+dataset scope, and a numeric selected-display value. Sorting stores a numeric
+key and a presentation-order RestaurantID list. Neither surface changes the
+canonical component row keyed by RestaurantID or becomes a metric-result table.
+
 ## Import safety
 
 Pulse should support correction/recovery when a wrong period, partial report, duplicate dataset, or other human error is finalized. Publication is a controlled state, not irreversible destruction of prior data.

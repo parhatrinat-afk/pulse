@@ -291,7 +291,7 @@ The mapping layer should support later metrics without redesign:
 - Quantity
 - Attach Rate
 - percentage-point / percentage change vs comparison
-- estimated NOK impact
+- NOK impact at the current selected-scope sales base
 - trends and leaderboards
 
 Do not implement all future metrics in 0.3.0 unless needed for validation. The priority is a correct reusable classification layer.
@@ -397,6 +397,28 @@ Use staged implementation rather than one monolithic script.
 - migrate Category Sales Share presentation to Reporting Group Sales Share;
 - keep current/comparison behavior and optional channel scope;
 - do not redesign Performance.
+
+### Phase 2C — interactive Sales Performance model
+
+- preserve `tblMetricRPGResults` as the authoritative KPI-0001 result layer;
+- reuse its additive Restaurant-scope numerator and denominator components for
+  arbitrary selected eligible-restaurant subsets;
+- add stable-ID Yes/No restaurant and active Reporting Group selection, where
+  Include state is authoritative and All versus Custom is derived;
+- keep the single detail Reporting Group selector independent of matrix
+  multi-selection;
+- calculate share/PP Grand Total from summed numerators and denominators, and
+  NOK Impact as aggregated current numerator minus aggregated comparison share
+  × aggregated current denominator;
+- add a Total column over the currently selected Reporting Groups. Current
+  Sales NOK Total is the selected current numerator; denominator-derived modes
+  use each scope denominator once;
+- sort only the visible restaurant presentation by Total or a displayed RPG,
+  using the full-precision numeric helper and never including Grand Total;
+- keep current and comparison ImportIDs independently selectable;
+- require Excel recalculation only for normal selection/display changes; and
+- do not materialize restaurant combinations, add another metric engine, add
+  new KPIs/channel UI, or redesign Performance.
 
 ### Phase 3 — Mapping UX + release QA
 

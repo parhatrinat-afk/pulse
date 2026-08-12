@@ -26,6 +26,31 @@ accepted Add-ons targets, enabled/deselected restaurant scope reconciliation,
 dynamic 306/288 cardinality, Performance formula guards, Reports linkage, and
 Office Scripts compiler/performance compatibility checks.
 
+Phase 2C adds authoritative stable-ID Include-state preservation, newly eligible
+default-No behavior, additive arbitrary-restaurant aggregation, weighted Grand
+Total, five display modes including current-sales-base NOK Impact,
+zero-denominator display guards, Company-control reconciliation,
+numeric-helper/text-facade isolation, removal of conditional number formats,
+selected-RPG Total semantics, full-precision presentation-only sorting,
+formula-only interaction guards, and Office Scripts static compatibility checks.
+
+UX Information Architecture Slice 1 adds deterministic coverage for the exact
+six-sheet visible workflow/order, preservation of all 47 accepted sheets,
+ordinary Overview navigation, A1 saved views, 16/16 Phase 2C preflight,
+restricted visibility/position/hyperlink mutation, accepted Phase 2C source
+hashes, and Office Scripts iterator/read-in-loop compatibility guards.
+
+UX Visual Slice 2A adds accepted-source hash locks, exact checkpoint/IA/QA
+preflight, primary-only gridline guards, formula and table content/schema
+fingerprints, structural Reports clipping safeguards, compact user-facing
+Performance Explain checks, restricted value-write checks, idempotence guards,
+and Office Scripts static compatibility/syntax checks.
+
+UX Visual Slice 2B locks the accepted Phase 2C/IA/Slice 2A sources and proves
+the pre-checkpoint cleanup can change only bounded Performance/Mapping layout,
+semantic presentation colors, and the Mapping date display. Formula, value,
+table, validation, IA, and 16/16 QA guards remain mandatory.
+
 For Build 0.3.0, tests should cover at minimum:
 
 - Reporting Group registry integrity.

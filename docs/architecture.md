@@ -74,6 +74,85 @@ neither the applicable Company numerator nor denominator. Company metric rows
 store a fingerprint of the sorted enabled RestaurantIDs so the materialized
 scope is auditable. This contract does not add or implement future KPIs.
 
+## Phase 2C interaction layer
+
+Phase 2C treats the Phase 2B eligible set as a refresh boundary and adds a
+separate interactive selection state. Stable-ID Yes/No tables select any
+subset of eligible restaurants and active Reporting Groups. All versus Custom
+is derived from those rows, not exposed as a separate control. Formula helpers
+sum the selected Phase 2B Restaurant-row numerators and denominators; they do
+not read facts or rematerialize combinations.
+
+The selected scope applies identically to current and comparison datasets.
+Share/PP Grand Total derives from summed selected numerators and denominators.
+NOK Impact subtracts aggregated comparison share × aggregated current
+denominator from the aggregated current numerator; it is never summed from
+restaurant-level impacts.
+Phase 2B Company rows remain unchanged as auditable all-eligible controls and
+must equal Phase 2C when every eligible restaurant is selected.
+
+The six `_Metric_Calc` component matrices and a bounded selected-display helper
+remain numeric. Performance renders the visible matrix through an isolated
+text facade so Display changes can recalculate without relying on conditional
+number formats. No metric, QA reconciliation, or Reports calculation may parse
+or otherwise consume that visible facade.
+
+A separate bounded Total helper aggregates the currently selected RPG
+numerators while retaining one current and one comparison denominator per
+restaurant scope. Share, PP Change, and NOK Impact are recomputed from those
+aggregate components; Current Sales NOK is the aggregate current numerator and
+does not depend on a denominator. A numeric sort-key helper orders only the
+visible restaurant lookup layer by Total or a displayed RPG. Canonical
+RestaurantID/component rows remain unchanged, and Grand Total never enters the
+sort range.
+
+This interaction mechanism is KPI-independent as scope state, but the additive
+aggregation is valid for KPI-0001 specifically because its approved numerator
+and denominator are additive across disjoint restaurants. Future KPIs require
+their own approved component contract.
+
+## Future workbook presentation boundary
+
+The development workbook currently exposes many engineering surfaces. They are
+valid implementation and troubleshooting assets, but they are not the intended
+long-term normal-user navigation model. A future explicitly scoped UX phase
+should target approximately these everyday surfaces:
+
+- Overview;
+- Performance;
+- Reports;
+- Imports / Refresh; and
+- Mapping.
+
+Restaurants, Reporting Groups, Settings, and KPI Registry are appropriate
+administration/configuration surfaces. Raw, staging, adapter, fact, bridge,
+helper, metric, audit, environment, build, QA, legacy CAT/remap, and other
+engineering sheets should eventually be hidden or protected from normal users
+while remaining available for advanced/admin troubleshooting. Build 0.3.0
+Phase 2C does not hide or remove any sheet.
+
+The accepted calculation architecture remains underneath that future boundary:
+
+- Performance should receive visual polish, stronger Total/Grand Total
+  hierarchy, and more polished selection panels without calculation redesign.
+- Overview should become a live, minimal, clickable Pulse home screen and is a
+  natural future home for the Pulse ♥ refresh workflow.
+- Reports should evolve into a meeting/export surface while consuming the same
+  centralized results.
+- Mapping should preserve hierarchical inheritance, stable IDs, explicit
+  exceptions, and rule lineage while presenting a simpler needs-attention →
+  choose Reporting Group → refresh workflow. Legacy Remap Assistant, Remap
+  Rules, and Effective Categories belong behind the authoritative RPG mapping
+  experience rather than alongside it for normal users.
+- Imports should retain the engineering workflow underneath while eventually
+  presenting upload/import → Pulse ♥ → validation → refreshed model.
+- Detailed QA remains valuable engineering evidence; future user-facing views
+  may summarize it as readiness/issues indicators rather than exposing every QA
+  table.
+
+This is future-interface guidance only. It does not authorize sheet hiding,
+Pulse ♥ implementation, Overview/Reports/Mapping redesign, or Phase 3 work.
+
 ## Layers
 
 ### User layer

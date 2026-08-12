@@ -74,10 +74,65 @@ All meaningful Pulse changes are recorded here.
 - All sixteen Metric Results QA checks passed throughout the restaurant-scope
   round trip.
 
+### Implemented and live Excel accepted in Phase 2C
+
+- Added stable-ID Yes/No restaurant and Reporting Group selection over the
+  refresh-time eligible Performance scope. Selection state is authoritative;
+  All versus Custom is derived, not user-selected.
+- Preserved the separate single-RPG detail selector while adding a multi-RPG
+  matrix selection table.
+- Reused Phase 2B Restaurant result components for arbitrary selected scopes;
+  no fact reads, new metric engine, or restaurant-combination results were added.
+- Added PP Change, Current Share, Comparison Share, Current Sales NOK, and NOK
+  Impact matrix displays with recalculation-only interaction. NOK Impact applies
+  the comparison Reporting Group share to current selected-scope total sales,
+  then compares that baseline amount with current Reporting Group sales.
+- Kept the six canonical component matrices and a bounded selected-display
+  helper numeric while rendering the visible matrix through an isolated
+  FIXED-based text facade. This avoids Excel-for-web conditional number-format
+  parsing without changing calculations or requiring a script for Display
+  changes.
+- Defined share Grand Total as summed selected numerators divided by summed
+  denominators. NOK Impact Grand Total uses the aggregated current numerator
+  minus aggregated comparison share × aggregated current denominator; it never
+  sums restaurant-level impacts.
+- Added a Total column immediately after Restaurant. It aggregates only the
+  selected RPG numerators, uses each selected scope denominator once for
+  share/PP/NOK Impact, and keeps Current Sales NOK equal to the selected current
+  numerator without adding a denominator dependency.
+- Added formula-driven Sort by and Order controls. Full-precision numeric
+  helpers sort restaurants by Total or a displayed RPG; unavailable keys remain
+  last, ties use deterministic RestaurantID ordering, and Grand Total remains
+  fixed outside the ranking.
+- A retained-but-hidden RPG sort target is visibly reported and falls back to
+  Total until the RPG is displayed again. Sorting changes presentation order
+  only and leaves canonical component/helper identity untouched.
+- Removed the redundant visible Restaurant mode and Reporting Group mode
+  controls. Selection summaries now report all-selected or the selected count,
+  and concise wrapped scope/sort status text avoids the live-QA clipping found
+  in the earlier control layout.
+- Kept canonical zero-denominator values at zero while displaying an em dash in
+  Performance.
+- Preserved Phase 2B Company rows as QA/control totals and linked Reports to the
+  same interactive detail scope.
+- Added pre-mutation centralized-result validation, protected-surface
+  fingerprinting, Phase 2C Interaction QA, deterministic tests, and a live Excel
+  checklist.
+- Corrected QA-0302C-09 so the legitimate `Current Sales NOK` Display label is
+  not mistaken for an ` NOK` text-presentation suffix in the authoritative
+  numeric helper. The five Display modes and their calculations are unchanged.
+- Completed live Excel validation with all 16 Interaction QA checks PASS,
+  accepted Total/Grand Total and full-precision sorting behavior, all five
+  display modes, recalculation-only selection, Reports linkage, and the exact
+  Add-ons result round trip.
+- Added the six-sheet information-architecture slice and restrained Visual
+  Slices 2A/2B. The resulting workbook is the accepted clean functional 0.3.0
+  foundation, not the final Pulse UI.
+
 ### Still planned / later phases
 
-- Complete branch review and merge/release acceptance for Phase 2B.
-- Continue to Phase 3 only after Phase 2B acceptance.
+- Complete controlled branch merge and Build 0.3.0 release acceptance.
+- Phase 3 remains unstarted and requires a separate approved scope.
 
 This section describes active development only. It does not advance the validated release checkpoint.
 
