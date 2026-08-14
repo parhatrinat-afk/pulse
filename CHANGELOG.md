@@ -152,6 +152,19 @@ All meaningful Pulse changes are recorded here.
 - Reconciled all 245,632 weekly rows, NOK 484,728,367.25, and Quantity
   2,469,988.09 without workbook publication, cache activation, legacy cutover,
   Power Automate, Performance, or Phase 3 changes.
+- Added a deterministic candidate compact weekly cache with one source/state
+  denominator row per Restaurant/week and nine dense mapped-RPG numerator rows
+  per Restaurant/week.
+- Added version/period manifests, current mapping/preflight freshness rejection,
+  stable row/version/cache fingerprints, candidate-only activation safety, and
+  the shared Performance restaurant-scope fingerprint.
+- Reconciled all 84 weeks, each source year, and the complete corpus across
+  Mapped, Unmapped, Identity Pending, Conflict, and Inactive Target; kept the
+  two Test Department identities outside normal Performance scope without
+  removing their facts.
+- Added independently aggregated W31, W01-W32, and W20-W30 range fixtures for
+  share, PP Change, Current Sales NOK, and NOK Impact. The 14,210-row analytical
+  candidate remains repository-only and does not cut over Performance.
 
 ### Still planned / later phases
 

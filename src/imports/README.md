@@ -16,11 +16,18 @@ Build 0.3.0 begins the bounded weekly source parser foundation here.
 - `audit-weekly-identity-preflight.mjs` runs that contract against one exact
   caller-supplied corpus plus a frozen accepted catalog snapshot. It remains
   read-only and creates no cache or workbook state.
+- `weekly-compact-cache.mjs` builds a validated candidate with one denominator
+  row per Restaurant/week and nine dense additive RPG rows per Restaurant/week.
+  It reuses the accepted identity preflight, current hierarchy resolver, and
+  shared Performance restaurant-scope fingerprint.
+- `audit-weekly-compact-cache.mjs` runs that candidate against one exact corpus
+  path and explicit accepted mapping/preflight fingerprints. It emits evidence
+  only; it does not materialize or activate a workbook cache.
 
-Neither slice publishes facts, builds the compact analytical cache, or
-supersedes legacy imports. The preflight may evaluate proposed ProductIDs through
-the existing mapping resolver, but it never creates mapping rules or treats
-identity creation as a business mapping decision.
+None of these foundations publishes weekly facts, activates the candidate
+cache, or supersedes legacy imports. The preflight may evaluate proposed
+ProductIDs through the existing mapping resolver, but it never creates mapping
+rules or treats identity creation as a business mapping decision.
 
 The weekly export has no encoded Channel/filter field. Scope is a human-owned
 manifest contract (`SCOPE-030-WEEKLY-SALES-PER-ITEM`), not an inference from

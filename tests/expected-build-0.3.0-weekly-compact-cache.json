@@ -1,0 +1,315 @@
+{
+  "schema_version": "0.3.0-weekly-compact-cache-v1",
+  "status": "PASS",
+  "cache_version": "WCV-2cd012763d86a794",
+  "cache_fingerprint": "WCC-7bd0c5f845b2a36d",
+  "mapping_fingerprint": "MAP-342029f71a922b47",
+  "mapping_as_of_date": "2026-08-12",
+  "source_corpus_fingerprint": "WSC-349b8bfd096ace2e",
+  "identity_preflight_fingerprint": "IDP-4cd1159238339096",
+  "performance_restaurant_scope_fingerprint": "RSC-08df626f217dd94b",
+  "counts": {
+    "periodRows": 84,
+    "cacheVersionRows": 1,
+    "scopeCacheRows": 1421,
+    "denseRpgCacheRows": 12789,
+    "nonzeroRpgCacheRows": 11688,
+    "analyticalRows": 14210,
+    "completeCandidateRows": 14295
+  },
+  "period_status_counts": {
+    "PASS": 84
+  },
+  "years": [
+    {
+      "label": "2025",
+      "source": {
+        "fact_count": 155349,
+        "sales_nok": 302378436.48,
+        "quantity": 1525252.09
+      },
+      "coverage": {
+        "Mapped": {
+          "fact_count": 144069,
+          "sales_nok": 296471168.13,
+          "quantity": 1451008.7
+        },
+        "Unmapped": {
+          "fact_count": 11228,
+          "sales_nok": 5905861.35,
+          "quantity": 74159.39
+        },
+        "Identity Pending": {
+          "fact_count": 52,
+          "sales_nok": 1407,
+          "quantity": 84
+        },
+        "Conflict": {
+          "fact_count": 0,
+          "sales_nok": 0,
+          "quantity": 0
+        },
+        "Inactive Target": {
+          "fact_count": 0,
+          "sales_nok": 0,
+          "quantity": 0
+        }
+      },
+      "status": "PASS"
+    },
+    {
+      "label": "2026",
+      "source": {
+        "fact_count": 90283,
+        "sales_nok": 182349930.77,
+        "quantity": 944736
+      },
+      "coverage": {
+        "Mapped": {
+          "fact_count": 82416,
+          "sales_nok": 177689373.47,
+          "quantity": 889097.91
+        },
+        "Unmapped": {
+          "fact_count": 7799,
+          "sales_nok": 4547088.3,
+          "quantity": 54771.09
+        },
+        "Identity Pending": {
+          "fact_count": 68,
+          "sales_nok": 113469,
+          "quantity": 867
+        },
+        "Conflict": {
+          "fact_count": 0,
+          "sales_nok": 0,
+          "quantity": 0
+        },
+        "Inactive Target": {
+          "fact_count": 0,
+          "sales_nok": 0,
+          "quantity": 0
+        }
+      },
+      "status": "PASS"
+    }
+  ],
+  "corpus": {
+    "source": {
+      "fact_count": 245632,
+      "sales_nok": 484728367.25,
+      "quantity": 2469988.09
+    },
+    "coverage": {
+      "Mapped": {
+        "fact_count": 226485,
+        "sales_nok": 474160541.6,
+        "quantity": 2340106.61
+      },
+      "Unmapped": {
+        "fact_count": 19027,
+        "sales_nok": 10452949.65,
+        "quantity": 128930.48
+      },
+      "Identity Pending": {
+        "fact_count": 120,
+        "sales_nok": 114876,
+        "quantity": 951
+      },
+      "Conflict": {
+        "fact_count": 0,
+        "sales_nok": 0,
+        "quantity": 0
+      },
+      "Inactive Target": {
+        "fact_count": 0,
+        "sales_nok": 0,
+        "quantity": 0
+      }
+    },
+    "status": "PASS"
+  },
+  "mapped_rpg_status": "PASS",
+  "performance_scope": {
+    "enabled": {
+      "fact_count": 244649,
+      "sales_nok": 484379675.25,
+      "quantity": 2468270.61
+    },
+    "excluded": {
+      "fact_count": 983,
+      "sales_nok": 348692,
+      "quantity": 1717.48
+    },
+    "status": "PASS"
+  },
+  "identity_pending": {
+    "fact_count": 120,
+    "sales_nok": 114876,
+    "quantity": 951
+  },
+  "hierarchy_review_product_ids": [
+    "PRD-000689",
+    "PRD-000027",
+    "PRD-000104",
+    "PRD-000233",
+    "PRD-000296",
+    "PRD-000365",
+    "PRD-000449",
+    "PRD-000596",
+    "PRD-000870"
+  ],
+  "reporting_scope_restaurant_ids": [
+    "RST-0001",
+    "RST-0002",
+    "RST-0003",
+    "RST-0004",
+    "RST-0005",
+    "RST-0006",
+    "RST-0007",
+    "RST-0008",
+    "RST-0009",
+    "RST-0010",
+    "RST-0011",
+    "RST-0012",
+    "RST-0013",
+    "RST-0014",
+    "RST-0015",
+    "RST-0016"
+  ],
+  "excluded_reporting_scope_restaurant_ids": [
+    "RST-0017",
+    "RST-0018"
+  ],
+  "comparisons": [
+    {
+      "label": "W31 2026 vs W31 2025",
+      "current_denominator": {
+        "fact_count": 2988,
+        "sales_nok": 6754563,
+        "quantity": 35178.23
+      },
+      "comparison_denominator": {
+        "fact_count": 2929,
+        "sales_nok": 6869262.1,
+        "quantity": 35016.33
+      },
+      "results": [
+        {
+          "reporting_group_id": "RPG-0001",
+          "current_share": 0.011882782054146212,
+          "comparison_share": 0.006700865293813727,
+          "pp_change": 0.5181916760332484,
+          "current_sales_nok": 80263,
+          "nok_impact": 35001.58321842167
+        },
+        {
+          "reporting_group_id": "RPG-0005",
+          "current_share": 0.07226403839893121,
+          "comparison_share": 0.07291729340186336,
+          "pp_change": -0.0653255002932146,
+          "current_sales_nok": 488112,
+          "nok_impact": -4412.452072370332
+        },
+        {
+          "reporting_group_id": "RPG-0009",
+          "current_share": 0.6216514673118009,
+          "comparison_share": 0.6292488097083965,
+          "pp_change": -0.7597342396595597,
+          "current_sales_nok": 4198984,
+          "nok_impact": -51316.7278503757
+        }
+      ]
+    },
+    {
+      "label": "W01-W32 2026 vs W01-W32 2025",
+      "current_denominator": {
+        "fact_count": 90163,
+        "sales_nok": 182328251.77,
+        "quantity": 944608
+      },
+      "comparison_denominator": {
+        "fact_count": 98117,
+        "sales_nok": 180020565.03,
+        "quantity": 915303.76
+      },
+      "results": [
+        {
+          "reporting_group_id": "RPG-0001",
+          "current_share": 0.013073558139563134,
+          "comparison_share": 0.007336150732445015,
+          "pp_change": 0.5737407407118119,
+          "current_sales_nok": 2383679,
+          "nok_impact": 1046091.4622320954
+        },
+        {
+          "reporting_group_id": "RPG-0005",
+          "current_share": 0.07508610265879039,
+          "comparison_share": 0.07335902427480566,
+          "pp_change": 0.1727078383984726,
+          "current_sales_nok": 13690317.83,
+          "nok_impact": 314895.1824216917
+        },
+        {
+          "reporting_group_id": "RPG-0009",
+          "current_share": 0.6018468629229482,
+          "comparison_share": 0.6054122287741828,
+          "pp_change": -0.356536585123457,
+          "current_sales_nok": 109733686.35,
+          "nok_impact": -650066.92257604
+        }
+      ]
+    },
+    {
+      "label": "W20-W30 2026 vs W20-W30 2025",
+      "current_denominator": {
+        "fact_count": 32420,
+        "sales_nok": 66839922.22,
+        "quantity": 352391.88
+      },
+      "comparison_denominator": {
+        "fact_count": 39775,
+        "sales_nok": 73171701.24,
+        "quantity": 371432.43
+      },
+      "results": [
+        {
+          "reporting_group_id": "RPG-0001",
+          "current_share": 0.012494359243136773,
+          "comparison_share": 0.006825152231488558,
+          "pp_change": 0.5669207011648215,
+          "current_sales_nok": 835122,
+          "nok_impact": 378929.35570764536
+        },
+        {
+          "reporting_group_id": "RPG-0005",
+          "current_share": 0.08236722376604824,
+          "comparison_share": 0.0782758758227281,
+          "pp_change": 0.40913479433201394,
+          "current_sales_nok": 5505418.83,
+          "nok_impact": 273465.37830647547
+        },
+        {
+          "reporting_group_id": "RPG-0009",
+          "current_share": 0.5871262831640082,
+          "comparison_share": 0.6058911949386843,
+          "pp_change": -1.8764911774676096,
+          "current_sales_nok": 39243475.1,
+          "nok_impact": -1254245.243484512
+        }
+      ]
+    }
+  ],
+  "footprint": {
+    "periodColumns": 16,
+    "scopeColumns": 23,
+    "rpgColumns": 8,
+    "versionColumns": 20,
+    "totalCells": 136359,
+    "inMemoryJsonBytes": 4199516,
+    "estimatedAdditionalXlsxMegabytes": {
+      "low": 0.76,
+      "high": 2.31
+    }
+  }
+}

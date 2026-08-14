@@ -69,6 +69,13 @@ checkpoint is frozen in `expected-build-0.3.0-weekly-identity.json`; its catalog
 input is the read-only `fixtures/build-0.3.0-weekly-identity-catalog.json`
 snapshot rather than a workbook artifact.
 
+The candidate compact weekly cache suite validates deterministic candidate
+versioning and row IDs, one denominator per Restaurant/week, dense nine-RPG
+numerators, all five mapping/identity states, Test Department scope exclusion,
+current Product-hierarchy authority, stale-state rejection, complete weekly and
+range aggregation, and the frozen 84-week reconciliation checkpoint. The cache
+remains repository/test-space evidence and is not materialized or activated.
+
 For Build 0.3.0, tests should cover at minimum:
 
 - Reporting Group registry integrity.

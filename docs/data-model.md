@@ -102,6 +102,22 @@ dataset scope, and a numeric selected-display value. Sorting stores a numeric
 key and a presentation-order RestaurantID list. Neither surface changes the
 canonical component row keyed by RestaurantID or becomes a metric-result table.
 
+### Candidate Weekly Analytical Cache
+
+The Build 0.3.0 weekly candidate is versioned derived state, not a replacement
+for source reports, published facts, Mapping, or active Phase 2B results. Its
+scope table has one row per CacheVersion, SourcePeriodKey, and RestaurantID and
+stores the source denominator plus Mapped, Unmapped, Identity Pending, Conflict,
+and Inactive Target additive components. Its RPG table adds ReportingGroupID and
+stores only Mapped fact count, Sales NOK, and Quantity. The denominator is not
+duplicated per Reporting Group.
+
+Identity Pending facts remain in source scope and outside RPG numerators.
+Performance eligibility is shared scope metadata, not fact suppression. A
+version manifest records source/preflight/mapping/group/scope fingerprints and
+MappingAsOfDate. Candidate validation and activation are separate states; this
+slice does not activate or connect the cache to Performance.
+
 ## Import safety
 
 Pulse should support correction/recovery when a wrong period, partial report, duplicate dataset, or other human error is finalized. Publication is a controlled state, not irreversible destruction of prior data.

@@ -20,10 +20,11 @@ restaurant sorting, a weighted Grand Total, and five matrix views without
 requiring scripts during normal use. Build 0.2.0-QA remains the
 validated release checkpoint until Build 0.3.0 release acceptance.
 
-The bounded weekly source parser is checkpointed, and the next read-only
-identity preflight now reuses exact accepted Pulse IDs, proposes deterministic
-IDs for new exact source identities, and surfaces ambiguity/hierarchy evidence
-without publishing weekly facts or activating a historical cache.
+The bounded weekly parser and identity preflight are checkpointed. The next
+candidate compact weekly cache now aggregates the accepted 84-week corpus into
+versioned Restaurant/week scope denominators and dense nine-RPG additive
+components in repository/test space. It remains inactive and is not connected
+to Performance or materialized in the canonical workbook.
 
 The Excel workbook is currently the user-facing product. The repository is the source of truth for product rules, metric logic, tests, documentation, Office Scripts, and reproducible build assets.
 
