@@ -1,0 +1,33 @@
+{
+  "contract": "Build 0.3.0 candidate authoritative weekly Sales per Item corpus",
+  "scope_id": "SCOPE-030-WEEKLY-SALES-PER-ITEM",
+  "scope_note": "The source contains no channel or export-filter field. Channel scope is controlled by the approved export configuration and must not be inferred from names or Sales Account values.",
+  "report_count": 84,
+  "unique_period_count": 84,
+  "first_period_start": "2024-12-30",
+  "last_period_end": "2026-08-09",
+  "coverage": {
+    "2025": {
+      "weeks": "W01-W52",
+      "report_count": 52
+    },
+    "2026": {
+      "weeks": "W01-W32",
+      "report_count": 32
+    }
+  },
+  "source_row_count": 245632,
+  "total_sales_nok": 484728367.25,
+  "total_quantity": 2469988.09,
+  "total_source_bytes": 8284656,
+  "unique_restaurant_source_values": 18,
+  "unique_item_source_values": 795,
+  "scope_fingerprint": "SCP-6bc35e1b70f2cb99",
+  "schema_version": "sales-per-item-v1",
+  "corpus_fingerprint": "WSC-349b8bfd096ace2e",
+  "duplicate_period_count": 0,
+  "duplicate_file_id_count": 0,
+  "overlap_count": 0,
+  "gap_count": 0,
+  "status": "PASS"
+}

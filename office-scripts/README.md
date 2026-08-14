@@ -47,6 +47,11 @@ Current scripts include:
   Reporting Group IDs. It reuses semantically identical active rules and adds
   the eight approved Product exclusions without changing facts or metric
   presentation.
+- `Parse_Weekly_Sales_Report.ts` — read-only parser adapter for one untouched
+  weekly `Sales per Item` export. It derives period identity from `A1`, validates
+  the exact seven-column schema, returns normalized source rows and a
+  filename-independent manifest, and performs no staging, publication, mapping,
+  cache, or workbook mutation.
 
 Build 0.3.0 scripts should preserve the existing workbook unless an explicit migration is required. They must not rewrite raw imported source data as part of mapping.
 

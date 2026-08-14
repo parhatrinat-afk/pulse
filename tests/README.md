@@ -51,6 +51,15 @@ the pre-checkpoint cleanup can change only bounded Performance/Mapping layout,
 semantic presentation colors, and the Mapping date display. Formula, value,
 table, validation, IA, and 16/16 QA guards remain mandatory.
 
+The weekly source parser suite validates internal Period identity, exact schema,
+Monday–Sunday ISO weeks, exact-string preservation, filename independence,
+runtime-independent numeric canonicalization for deterministic
+semantic/file/row/corpus fingerprints, self-reconciliation,
+duplicate/overlap/gap detection, explicit non-inference of channel scope, and a
+read-only Office Scripts adapter. The local 84-file fixture corpus is not stored
+in Git; its accepted aggregate evidence is frozen in
+`expected-build-0.3.0-weekly-source.json`.
+
 For Build 0.3.0, tests should cover at minimum:
 
 - Reporting Group registry integrity.

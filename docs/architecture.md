@@ -111,6 +111,22 @@ aggregation is valid for KPI-0001 specifically because its approved numerator
 and denominator are additive across disjoint restaurants. Future KPIs require
 their own approved component contract.
 
+## Weekly source parser boundary
+
+The Build 0.3.0 weekly parser treats the internal `Period:` field and exact
+`Sales per Item` schema as source authority. Filename and folder names are
+audit/navigation metadata only. The report contains no Channel or persisted
+export-filter field, so scope such as In-house/Takeaway must come from a
+human-approved export contract and must never be inferred from product,
+category, or Sales Account strings.
+
+The first parser slice is read-only and stops at normalized source rows plus a
+deterministic manifest. It does not publish facts, assign new stable IDs, apply
+mapping, build the compact weekly analytical cache, or supersede the accepted
+legacy imports. Original weekly exports remain the candidate durable detail;
+historical remapping and compact-cache publication require later approved
+slices.
+
 ## Future workbook presentation boundary
 
 The development workbook currently exposes many engineering surfaces. They are
