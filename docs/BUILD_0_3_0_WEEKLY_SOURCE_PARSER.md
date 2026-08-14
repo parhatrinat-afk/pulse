@@ -150,3 +150,7 @@ approved slices must still provide:
 
 Differences from the old annual baseline/W31 fixture are evidence to explain by
 scope, not parser failures when the two source scopes are not equivalent.
+
+The first item is now implemented as the bounded read-only Weekly Identity
+Preflight documented in `BUILD_0_3_0_WEEKLY_IDENTITY_PREFLIGHT.md`. It does not
+activate the later cache or cutover steps.

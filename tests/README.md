@@ -60,6 +60,15 @@ read-only Office Scripts adapter. The local 84-file fixture corpus is not stored
 in Git; its accepted aggregate evidence is frozen in
 `expected-build-0.3.0-weekly-source.json`.
 
+The weekly identity preflight suite validates exact stable-key reuse,
+deterministic new Restaurant/Product/classification candidates, explicit
+ambiguity handling, Test Department separation, idempotent reruns, current
+Product-hierarchy authority, the frozen nine-item divergence review, and exact
+five-state fact/Sales/Quantity reconciliation. The 84-week accepted identity
+checkpoint is frozen in `expected-build-0.3.0-weekly-identity.json`; its catalog
+input is the read-only `fixtures/build-0.3.0-weekly-identity-catalog.json`
+snapshot rather than a workbook artifact.
+
 For Build 0.3.0, tests should cover at minimum:
 
 - Reporting Group registry integrity.

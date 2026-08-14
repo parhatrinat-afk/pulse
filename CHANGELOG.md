@@ -129,6 +129,30 @@ All meaningful Pulse changes are recorded here.
   Slices 2A/2B. The resulting workbook is the accepted clean functional 0.3.0
   foundation, not the final Pulse UI.
 
+### Implemented in weekly source/identity foundations
+
+- Added a deterministic read-only parser for the exact seven-column weekly POS
+  `Sales per Item` export, using the internal Period field rather than filenames
+  or folders for period identity.
+- Added runtime-independent semantic fingerprints, exact source-string
+  preservation, source-row lineage, scope/schema validation, and an 84-week
+  self-reconciling corpus manifest.
+- Added exact-key reuse of current Restaurant, Product, and Source
+  Classification catalogs plus deterministic stable-ID candidates for new
+  unambiguous source identities.
+- Kept identity recognition separate from Mapping. New ProductIDs inherit only
+  existing approved hierarchy rules and otherwise remain Unmapped.
+- Added explicit Identity Pending handling with reconciled impact for current
+  catalog collisions and new multi-hierarchy ProductKeys.
+- Preserved current Product hierarchy as mapping authority and surfaced the
+  nine accepted alternate-path mapping outcomes as review evidence, including
+  PRD-000689 Red Curry (RPG-0001 versus RPG-0009).
+- Kept the two exact Test Department spellings separate as RST-0017/RST-0018
+  candidates with ReportingEnabled=No.
+- Reconciled all 245,632 weekly rows, NOK 484,728,367.25, and Quantity
+  2,469,988.09 without workbook publication, cache activation, legacy cutover,
+  Power Automate, Performance, or Phase 3 changes.
+
 ### Still planned / later phases
 
 - Complete controlled branch merge and Build 0.3.0 release acceptance.

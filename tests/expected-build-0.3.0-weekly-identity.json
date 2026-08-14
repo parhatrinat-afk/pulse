@@ -1,0 +1,94 @@
+{
+  "contract_version": "0.3.0-weekly-identity-preflight-v1",
+  "status": "PASS WITH REVIEW",
+  "source_system_id": "SRC-TEST-SALES",
+  "report_count": 84,
+  "source": {
+    "fact_count": 245632,
+    "sales_nok": 484728367.25,
+    "quantity": 2469988.09
+  },
+  "known_reused": {
+    "restaurants": 16,
+    "products": 688,
+    "classifications": 142
+  },
+  "new_candidates": {
+    "restaurants": 2,
+    "products": 193,
+    "product_id_range": "PRD-001042–PRD-001234",
+    "classifications": 19,
+    "classification_id_range": "SCL-00146–SCL-00164"
+  },
+  "test_departments": [
+    {
+      "restaurant_id": "RST-0017",
+      "source_name": "Test Department (Not for User)",
+      "reporting_enabled": "No",
+      "impact": {
+        "fact_count": 19,
+        "sales_nok": 4133,
+        "quantity": 18
+      }
+    },
+    {
+      "restaurant_id": "RST-0018",
+      "source_name": "Test Department (Not for Users)",
+      "reporting_enabled": "No",
+      "impact": {
+        "fact_count": 964,
+        "sales_nok": 344559,
+        "quantity": 1699.48
+      }
+    }
+  ],
+  "identity_pending_count": 6,
+  "hierarchy_review_product_ids": [
+    "PRD-000689",
+    "PRD-000027",
+    "PRD-000104",
+    "PRD-000233",
+    "PRD-000296",
+    "PRD-000365",
+    "PRD-000449",
+    "PRD-000596",
+    "PRD-000870"
+  ],
+  "mapping_states": {
+    "Mapped": {
+      "fact_count": 226485,
+      "sales_nok": 474160541.6,
+      "quantity": 2340106.61
+    },
+    "Unmapped": {
+      "fact_count": 19027,
+      "sales_nok": 10452949.65,
+      "quantity": 128930.48
+    },
+    "Conflict": {
+      "fact_count": 0,
+      "sales_nok": 0,
+      "quantity": 0
+    },
+    "Inactive Target": {
+      "fact_count": 0,
+      "sales_nok": 0,
+      "quantity": 0
+    },
+    "Identity Pending": {
+      "fact_count": 120,
+      "sales_nok": 114876,
+      "quantity": 951
+    }
+  },
+  "reconciliation_status": "PASS",
+  "duplicate_proposed_stable_ids": [],
+  "duplicate_proposed_stable_keys": [],
+  "fingerprints": {
+    "sourceCorpusFingerprint": "WSC-349b8bfd096ace2e",
+    "catalogFingerprint": "IDC-56484a052b6a4cab",
+    "candidateFingerprint": "IDN-4803e1706372df44",
+    "reviewFingerprint": "IDR-5eb0d5643dc88499",
+    "preflightFingerprint": "IDP-4cd1159238339096"
+  }
+}
