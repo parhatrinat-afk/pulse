@@ -8,7 +8,10 @@ import {
   compareCandidateCacheRanges,
   validateWeeklyCacheFreshness,
 } from "../src/imports/weekly-compact-cache.mjs";
-import { buildWeeklyIdentityPreflight } from "../src/imports/weekly-identity-preflight.mjs";
+import {
+  buildWeeklyIdentityPreflight,
+  deriveWeeklyMappingContentFingerprint,
+} from "../src/imports/weekly-identity-preflight.mjs";
 import {
   WEEKLY_SALES_HEADERS,
   parseWeeklySalesMatrix,
@@ -185,15 +188,13 @@ test("stale mapping and stale accepted preflight fail before candidate construct
   assert.throws(() => buildCandidateWeeklyCache({
     parsedReports: reports,
     catalogs: catalog,
-    expectedMappingFingerprint: "MAP-stale",
-    expectedMappingAsOfDate: catalog.catalogAsOfDate,
+    expectedMappingContentFingerprint: "MCF-stale",
     expectedIdentityPreflightFingerprint: preflight.fingerprints.preflightFingerprint,
   }), /PUL-030C-012/);
   assert.throws(() => buildCandidateWeeklyCache({
     parsedReports: reports,
     catalogs: catalog,
-    expectedMappingFingerprint: catalog.mappingFingerprint,
-    expectedMappingAsOfDate: catalog.catalogAsOfDate,
+    expectedMappingContentFingerprint: preflight.mappingContentFingerprint,
     expectedIdentityPreflightFingerprint: "IDP-stale",
   }), /PUL-030C-004/);
 });
@@ -209,8 +210,7 @@ test("candidate version cannot overwrite an active cache version", () => {
   assert.throws(() => buildCandidateWeeklyCache({
     parsedReports: reports,
     catalogs: catalog,
-    expectedMappingFingerprint: catalog.mappingFingerprint,
-    expectedMappingAsOfDate: catalog.catalogAsOfDate,
+    expectedMappingContentFingerprint: preflight.mappingContentFingerprint,
     expectedIdentityPreflightFingerprint: preflight.fingerprints.preflightFingerprint,
     existingVersionManifests: [{
       ...first.versionManifest,
@@ -227,23 +227,72 @@ test("freshness validation is deterministic and user-visible", () => {
 
   assert.deepEqual(validateWeeklyCacheFreshness({
     versionManifest: cache.versionManifest,
-    currentMappingFingerprint: "MAP-fixture",
-    currentMappingAsOfDate: "2026-08-12",
+    currentMappingContentFingerprint: cache.versionManifest.mappingContentFingerprint,
   }), []);
   assert.deepEqual(validateWeeklyCacheFreshness({
     versionManifest: cache.versionManifest,
-    currentMappingFingerprint: "MAP-changed",
-    currentMappingAsOfDate: "2026-08-13",
+    currentMappingContentFingerprint: "MCF-changed",
   }), [
-    "Candidate cache mapping fingerprint MAP-fixture differs from current MAP-changed.",
-    "Candidate cache MappingAsOfDate 2026-08-12 differs from current 2026-08-13.",
+    `Candidate cache MappingContentFingerprint ${cache.versionManifest.mappingContentFingerprint} differs from current MCF-changed.`,
   ]);
+});
+
+test("date-only audit advancement does not stale or re-version weekly cache content", () => {
+  const reports = [report(2026, 1, [
+    sourceRow("Known Restaurant", "Main A", "Sub A", "Known Product", 1, 100),
+  ])];
+  const august11 = fixtureCatalog();
+  august11.catalogAsOfDate = "2026-08-11";
+  august11.catalogAsOfExcelSerial = 46245;
+  august11.mappingFingerprint = "MAP-date-sensitive-11";
+  const august12 = fixtureCatalog();
+  august12.mappingFingerprint = "MAP-date-sensitive-12";
+  const first = buildCache(reports, august11);
+  const second = buildCache(reports, august12);
+
+  assert.equal(first.versionManifest.mappingContentFingerprint,
+    second.versionManifest.mappingContentFingerprint);
+  assert.equal(first.versionManifest.cacheVersion, second.versionManifest.cacheVersion);
+  assert.equal(first.versionManifest.cacheFingerprint, second.versionManifest.cacheFingerprint);
+  assert.deepEqual(first.scopeCacheRows, second.scopeCacheRows);
+  assert.deepEqual(first.weeklyRpgCacheRows, second.weeklyRpgCacheRows);
+  assert.notEqual(first.versionManifest.mappingFingerprint, second.versionManifest.mappingFingerprint);
+  assert.notEqual(first.versionManifest.mappingAsOfDate, second.versionManifest.mappingAsOfDate);
+  assert.deepEqual(validateWeeklyCacheFreshness({
+    versionManifest: first.versionManifest,
+    currentMappingContentFingerprint: second.versionManifest.mappingContentFingerprint,
+  }), []);
+});
+
+test("actual mapping content changes are rejected by the weekly stale gate", () => {
+  const reports = [report(2026, 1, [
+    sourceRow("Known Restaurant", "Main A", "Sub A", "Known Product", 1, 100),
+  ])];
+  const accepted = fixtureCatalog();
+  const expectedMappingContentFingerprint = deriveWeeklyMappingContentFingerprint(accepted);
+  const changed = fixtureCatalog();
+  changed.mappingRules[0].targetReportingGroupId = "RPG-0002";
+
+  assert.notEqual(
+    deriveWeeklyMappingContentFingerprint(changed),
+    expectedMappingContentFingerprint,
+  );
+  assert.throws(() => buildCandidateWeeklyCache({
+    parsedReports: reports,
+    catalogs: changed,
+    expectedMappingContentFingerprint,
+    expectedIdentityPreflightFingerprint: "IDP-not-reached",
+  }), /PUL-030C-012.*MappingContentFingerprint/);
 });
 
 test("frozen 84-week cache evidence covers all periods, states and required ranges", async () => {
   const expected = JSON.parse(await readFile(expectedPath, "utf8"));
 
   assert.equal(expected.status, "PASS");
+  assert.equal(expected.mapping_content_fingerprint, "MCF-759cc92c4304a913");
+  assert.equal(expected.identity_preflight_fingerprint, "IDP-062c182f23905ae8");
+  assert.equal(expected.cache_version, "WCV-1a34ad1f46763d9b");
+  assert.equal(expected.cache_fingerprint, "WCC-508dd608166cdb6e");
   assert.equal(expected.counts.periodRows, 84);
   assert.equal(expected.counts.scopeCacheRows, 1421);
   assert.equal(expected.counts.denseRpgCacheRows, 1421 * 9);
@@ -289,8 +338,7 @@ function buildCache(parsedReports, catalogs = fixtureCatalog()) {
   return buildCandidateWeeklyCache({
     parsedReports,
     catalogs,
-    expectedMappingFingerprint: catalogs.mappingFingerprint,
-    expectedMappingAsOfDate: catalogs.catalogAsOfDate,
+    expectedMappingContentFingerprint: preflight.mappingContentFingerprint,
     expectedIdentityPreflightFingerprint: preflight.fingerprints.preflightFingerprint,
   });
 }

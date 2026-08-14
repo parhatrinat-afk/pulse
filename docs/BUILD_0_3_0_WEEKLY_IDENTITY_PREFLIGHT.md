@@ -74,7 +74,8 @@ snapshot taken from the accepted canonical workbook state:
 - 9 Reporting Groups;
 - 133 Mapping Rules;
 - Catalog as-of date: 2026-08-12; and
-- Mapping fingerprint: `MAP-342029f71a922b47`.
+- Phase 2A audit mapping fingerprint: `MAP-34202a7a1a922bd0`; and
+- date-neutral weekly MappingContentFingerprint: `MCF-759cc92c4304a913`.
 
 The snapshot is deterministic test evidence, not a second live catalog. Before
 any later workbook mutation, the future implementation must reject or refresh
@@ -183,10 +184,20 @@ removed from denominators or source totals.
 Deterministic fingerprints are:
 
 - source corpus `WSC-349b8bfd096ace2e`;
-- accepted catalog `IDC-56484a052b6a4cab`;
+- accepted audit catalog `IDC-1aaa7b197f3b57f6`;
+- date-neutral catalog content `ICC-5644a77c18a97437`;
+- mapping content `MCF-759cc92c4304a913`;
 - candidates `IDN-4803e1706372df44`;
 - review `IDR-5eb0d5643dc88499`; and
-- complete preflight `IDP-4cd1159238339096`.
+- complete preflight `IDP-062c182f23905ae8`.
+
+The Phase 2A/2B `PULSE-MAPPING-SEMANTIC-V2` fingerprint remains date-sensitive
+and unchanged. Weekly preflight/cache identity instead uses the content-only
+fingerprint derived from Reporting Groups, Mapping Rules (including effective
+boundaries), Product hierarchy, and Effective Mapping outcomes. The proven
+2026-08-11 and 2026-08-12 mapping states both produce
+`MCF-759cc92c4304a913`; their different as-of dates and Phase 2A audit hashes
+remain recorded separately.
 
 ## Running the read-only preflight
 
@@ -205,6 +216,8 @@ writes source reports, or opens/mutates the canonical workbook.
 
 No live Excel run is required for this slice because it adds no Office Script
 and no workbook mutation. Before a later candidate-catalog/cache mutation, use
-the connected canonical `Pulse_Current.xlsx` to confirm that its catalog maxima,
-mapping rules, and mapping fingerprint still match the frozen snapshot. A
-difference must cause a refresh/review, not silent use of stale identity evidence.
+the connected canonical `Pulse_Current.xlsx` to confirm its catalog maxima and
+derive the current MappingContentFingerprint. A difference in mapping content
+must cause a refresh/review, not silent use of stale identity evidence. The
+date-sensitive Phase 2A fingerprint and MappingAsOfDate remain audit metadata;
+a date-only audit change does not stale weekly identity/cache content.

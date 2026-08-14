@@ -2,6 +2,7 @@ import {
   IDENTITY_PENDING,
   WEEKLY_IDENTITY_PREFLIGHT_VERSION,
   buildWeeklyIdentityPreflight,
+  deriveWeeklyMappingContentFingerprint,
 } from "./weekly-identity-preflight.mjs";
 import {
   WEEKLY_SALES_PARSER_VERSION,
@@ -46,15 +47,13 @@ const CACHE_STATE_FIELDS = Object.freeze({
 export function buildCandidateWeeklyCache({
   parsedReports,
   catalogs,
-  expectedMappingFingerprint,
-  expectedMappingAsOfDate,
+  expectedMappingContentFingerprint,
   expectedIdentityPreflightFingerprint,
   existingVersionManifests = [],
 }) {
   validateMappingInput({
     catalogs,
-    expectedMappingFingerprint,
-    expectedMappingAsOfDate,
+    expectedMappingContentFingerprint,
   });
   const corpus = buildWeeklyCorpusManifest(parsedReports);
   if (corpus.status !== "PASS") {
@@ -64,9 +63,8 @@ export function buildCandidateWeeklyCache({
   if (preflight.reconciliation.status !== "PASS") {
     fail("PUL-030C-002", "Weekly Identity Preflight must reconcile before cache construction.");
   }
-  if (preflight.mappingFingerprint !== expectedMappingFingerprint ||
-      preflight.catalogAsOfDate !== expectedMappingAsOfDate) {
-    fail("PUL-030C-003", "Weekly Identity Preflight mapping state is stale.");
+  if (preflight.mappingContentFingerprint !== expectedMappingContentFingerprint) {
+    fail("PUL-030C-003", "Weekly Identity Preflight mapping content is stale.");
   }
   if (preflight.fingerprints.preflightFingerprint !== expectedIdentityPreflightFingerprint) {
     fail(
@@ -88,8 +86,7 @@ export function buildCandidateWeeklyCache({
   const cacheVersion = buildCacheVersion({
     corpusFingerprint: corpus.corpusFingerprint,
     preflightFingerprint: preflight.fingerprints.preflightFingerprint,
-    mappingFingerprint: expectedMappingFingerprint,
-    mappingAsOfDate: expectedMappingAsOfDate,
+    mappingContentFingerprint: expectedMappingContentFingerprint,
     activeGroups,
     restaurants,
   });
@@ -206,7 +203,7 @@ export function buildCandidateWeeklyCache({
     fail("PUL-030C-010", `Candidate weekly cache validation failed: ${validation.errors.join("; ")}`);
   }
 
-  const cacheFingerprint = fingerprintCacheRows({
+  const cacheFingerprint = fingerprintWeeklyCacheRows({
     cacheVersion,
     periodManifest,
     scopeCacheRows,
@@ -224,8 +221,10 @@ export function buildCandidateWeeklyCache({
     sourceCorpusFingerprint: corpus.corpusFingerprint,
     identityPreflightFingerprint: preflight.fingerprints.preflightFingerprint,
     catalogFingerprint: preflight.fingerprints.catalogFingerprint,
-    mappingFingerprint: expectedMappingFingerprint,
-    mappingAsOfDate: expectedMappingAsOfDate,
+    catalogContentFingerprint: preflight.fingerprints.catalogContentFingerprint,
+    mappingContentFingerprint: expectedMappingContentFingerprint,
+    mappingFingerprint: preflight.mappingFingerprint,
+    mappingAsOfDate: preflight.catalogAsOfDate,
     activeReportingGroupFingerprint: fingerprintActiveGroups(activeGroups),
     performanceRestaurantScopeFingerprint: deterministicRestaurantScopeFingerprint(
       reportingScopeRestaurantIds.map(restaurantId => ({ restaurantId })),
@@ -253,18 +252,12 @@ export function buildCandidateWeeklyCache({
 
 export function validateWeeklyCacheFreshness({
   versionManifest,
-  currentMappingFingerprint,
-  currentMappingAsOfDate,
+  currentMappingContentFingerprint,
 }) {
   const errors = [];
-  if (versionManifest.mappingFingerprint !== currentMappingFingerprint) {
+  if (versionManifest.mappingContentFingerprint !== currentMappingContentFingerprint) {
     errors.push(
-      `Candidate cache mapping fingerprint ${versionManifest.mappingFingerprint} differs from current ${currentMappingFingerprint}.`,
-    );
-  }
-  if (versionManifest.mappingAsOfDate !== currentMappingAsOfDate) {
-    errors.push(
-      `Candidate cache MappingAsOfDate ${versionManifest.mappingAsOfDate} differs from current ${currentMappingAsOfDate}.`,
+      `Candidate cache MappingContentFingerprint ${versionManifest.mappingContentFingerprint} differs from current ${currentMappingContentFingerprint}.`,
     );
   }
   return errors;
@@ -360,19 +353,16 @@ export function estimateCandidateWorkbookFootprint(cache) {
   };
 }
 
-function validateMappingInput({ catalogs, expectedMappingFingerprint, expectedMappingAsOfDate }) {
-  const expectedFingerprint = requiredText(expectedMappingFingerprint, "expected mapping fingerprint");
-  const expectedDate = requiredText(expectedMappingAsOfDate, "expected MappingAsOfDate");
-  if (catalogs?.mappingFingerprint !== expectedFingerprint) {
+function validateMappingInput({ catalogs, expectedMappingContentFingerprint }) {
+  const expectedFingerprint = requiredText(
+    expectedMappingContentFingerprint,
+    "expected MappingContentFingerprint",
+  );
+  const currentFingerprint = deriveWeeklyMappingContentFingerprint(catalogs);
+  if (currentFingerprint !== expectedFingerprint) {
     fail(
       "PUL-030C-012",
-      `Catalog mapping fingerprint ${catalogs?.mappingFingerprint ?? "(missing)"} differs from accepted ${expectedFingerprint}.`,
-    );
-  }
-  if (catalogs?.catalogAsOfDate !== expectedDate) {
-    fail(
-      "PUL-030C-013",
-      `Catalog as-of date ${catalogs?.catalogAsOfDate ?? "(missing)"} differs from accepted ${expectedDate}.`,
+      `Catalog MappingContentFingerprint ${currentFingerprint} differs from accepted ${expectedFingerprint}.`,
     );
   }
 }
@@ -424,8 +414,7 @@ function buildRestaurantRegistry(catalogs, preflight) {
 function buildCacheVersion({
   corpusFingerprint,
   preflightFingerprint,
-  mappingFingerprint,
-  mappingAsOfDate,
+  mappingContentFingerprint,
   activeGroups,
   restaurants,
 }) {
@@ -433,7 +422,7 @@ function buildCacheVersion({
     record("SCHEMA", [WEEKLY_COMPACT_CACHE_SCHEMA_VERSION]),
     record("CORPUS", [corpusFingerprint]),
     record("IDENTITY", [preflightFingerprint]),
-    record("MAPPING", [mappingFingerprint, mappingAsOfDate]),
+    record("MAPPING_CONTENT", [mappingContentFingerprint]),
     ...activeGroups.map(row => record("RPG", [row.reportingGroupId])),
     ...restaurants.map(row => record("RESTAURANT", [
       row.restaurantId,
@@ -690,7 +679,12 @@ function canonicalComponents(numeratorSalesNok, denominatorSalesNok) {
   };
 }
 
-function fingerprintCacheRows({ cacheVersion, periodManifest, scopeCacheRows, weeklyRpgCacheRows }) {
+export function fingerprintWeeklyCacheRows({
+  cacheVersion,
+  periodManifest,
+  scopeCacheRows,
+  weeklyRpgCacheRows,
+}) {
   const records = [record("CACHE_VERSION", [cacheVersion])];
   for (const row of periodManifest) {
     records.push(record("PERIOD", [

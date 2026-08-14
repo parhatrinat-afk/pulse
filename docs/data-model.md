@@ -114,9 +114,13 @@ duplicated per Reporting Group.
 
 Identity Pending facts remain in source scope and outside RPG numerators.
 Performance eligibility is shared scope metadata, not fact suppression. A
-version manifest records source/preflight/mapping/group/scope fingerprints and
-MappingAsOfDate. Candidate validation and activation are separate states; this
-slice does not activate or connect the cache to Performance.
+version manifest records source/preflight/mapping-content/group/scope
+fingerprints. MappingAsOfDate and the existing Phase 2A mapping fingerprint are
+retained separately as audit metadata. Weekly cache staleness is driven by the
+date-neutral MappingContentFingerprint, so a date-only advance does not
+invalidate unchanged mapping content. Candidate validation and activation are
+separate states; this slice does not activate or connect the cache to
+Performance.
 
 ## Import safety
 

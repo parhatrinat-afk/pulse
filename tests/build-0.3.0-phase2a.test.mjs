@@ -6,6 +6,7 @@ import {
   buildLegacyRpgCrosswalk,
   buildMetricBridge,
   compareLegacyDefinitions,
+  computeMappingContentFingerprint,
   computeMappingFingerprint,
   reconcileFactsAndBridge,
   validateEffectiveMappingFreshness,
@@ -95,6 +96,42 @@ test("mapping fingerprint is stable across source row ordering", () => {
     products,
     resolutions: reorderedConflictMembers,
   }), fingerprint);
+});
+
+test("weekly MappingContentFingerprint is order-stable and excludes audit date", () => {
+  const contentFingerprint = computeMappingContentFingerprint({
+    groups,
+    rules,
+    products,
+    resolutions,
+  });
+  const reordered = computeMappingContentFingerprint({
+    groups: [...groups].reverse(),
+    rules: [...rules].reverse(),
+    products: [...products].reverse(),
+    resolutions: [...resolutions].reverse(),
+  });
+
+  assert.match(contentFingerprint, /^MCF-[0-9a-f]{16}$/);
+  assert.equal(reordered, contentFingerprint);
+  assert.notEqual(
+    computeMappingFingerprint({
+      asOfDate: asOfDate - 1,
+      groups,
+      rules,
+      products,
+      resolutions,
+    }),
+    computeMappingFingerprint({ asOfDate, groups, rules, products, resolutions }),
+  );
+  assert.notEqual(computeMappingContentFingerprint({
+    groups,
+    rules: rules.map(rule => rule.mappingRuleId === "MAP-1"
+      ? { ...rule, targetReportingGroupId: "RPG-0002" }
+      : rule),
+    products,
+    resolutions,
+  }), contentFingerprint);
 });
 
 test("fresh Effective Mapping validates and stale mapping is rejected", () => {

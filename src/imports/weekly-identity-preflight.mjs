@@ -1,4 +1,5 @@
 import { resolveProduct } from "../mapping/hierarchical-resolver.mjs";
+import { computeMappingContentFingerprint } from "../metrics/reporting-group-metrics.mjs";
 import { buildWeeklyCorpusManifest } from "./weekly-sales-parser.mjs";
 
 export const WEEKLY_IDENTITY_PREFLIGHT_VERSION = "0.3.0-weekly-identity-preflight-v1";
@@ -17,6 +18,61 @@ const MAPPING_STATES = Object.freeze([
 ]);
 
 /**
+ * Derive the weekly cache's date-neutral mapping content fingerprint from the
+ * current Pulse catalogs. Resolution still uses the catalog as-of date so a
+ * rule becoming effective changes Effective Mapping and therefore the hash;
+ * the date value itself is not serialized.
+ */
+export function deriveWeeklyMappingContentFingerprint(catalogs) {
+  const sourceSystemId = requiredText(catalogs?.sourceSystemId, "catalog SourceSystemID");
+  for (const field of ["products", "classifications", "reportingGroups", "mappingRules"]) {
+    if (!Array.isArray(catalogs?.[field])) {
+      throw new Error(`PUL-030I-101: Catalog ${field} is missing.`);
+    }
+  }
+  const asOf = finiteNumber(catalogs.catalogAsOfExcelSerial, "CatalogAsOfExcelSerial");
+  const classificationById = uniqueIndex(
+    catalogs.classifications,
+    row => row.sourceClassificationId,
+  );
+  const mappingByProduct = materializeProductMapping({
+    products: catalogs.products,
+    classificationById,
+    rules: catalogs.mappingRules,
+    groups: catalogs.reportingGroups,
+    asOf,
+  });
+  const products = catalogs.products.map(product => {
+    const classification = classificationById.get(product.sourceClassificationId);
+    return {
+      productId: product.productId,
+      sourceSystemId: product.sourceSystemId ?? sourceSystemId,
+      mainNodeId: classification?.value && !classification.collision
+        ? mainNodeId(product.sourceSystemId ?? sourceSystemId, classification.value.sourceMainCategory)
+        : "",
+      subNodeId: product.sourceClassificationId ?? "",
+    };
+  });
+  const resolutions = products.map(product => {
+    const resolution = mappingByProduct.get(product.productId) ?? {};
+    return {
+      productId: product.productId,
+      effectiveReportingGroupId: resolution.effectiveReportingGroupId ?? "",
+      resolutionSource: resolution.resolutionSource ?? "Identity",
+      resolutionState: resolution.resolutionState ?? IDENTITY_PENDING,
+      resolutionStatus: resolution.resolutionStatus ?? IDENTITY_PENDING,
+      winningRuleId: resolution.ruleId ?? "",
+    };
+  });
+  return computeMappingContentFingerprint({
+    groups: catalogs.reportingGroups,
+    rules: catalogs.mappingRules,
+    products,
+    resolutions,
+  });
+}
+
+/**
  * Resolve parsed weekly source strings against current Pulse catalogs, propose
  * stable candidates for new exact identities, and expose ambiguity/review
  * evidence. This function does not mutate catalogs, facts, mappings, or source
@@ -31,6 +87,14 @@ export function buildWeeklyIdentityPreflight({ parsedReports, catalogs }) {
   }
   const rows = reports.flatMap(report => report.rows);
   const catalog = validateCatalogs(catalogs, sourceSystemId);
+  const mappingContentFingerprint = deriveWeeklyMappingContentFingerprint(catalog);
+  if (catalog.declaredMappingContentFingerprint &&
+      catalog.declaredMappingContentFingerprint !== mappingContentFingerprint) {
+    throw new Error(
+      `PUL-030I-109: Catalog MappingContentFingerprint ${catalog.declaredMappingContentFingerprint} differs from derived ${mappingContentFingerprint}.`,
+    );
+  }
+  catalog.mappingContentFingerprint = mappingContentFingerprint;
   const observed = observeSourceRows(rows, sourceSystemId);
 
   const restaurantPlan = planRestaurants(observed.restaurants, catalog.restaurants, sourceSystemId);
@@ -180,6 +244,7 @@ export function buildWeeklyIdentityPreflight({ parsedReports, catalogs }) {
     sourceSystemId,
     catalogAsOfDate: catalog.catalogAsOfDate,
     mappingFingerprint: catalog.mappingFingerprint,
+    mappingContentFingerprint,
     reportCount: reports.length,
     sourceTotals,
     knownIdentitiesReused: {
@@ -220,6 +285,7 @@ export function summarizeWeeklyIdentityPreflight(result, candidateLimit = 20) {
     sourceSystemId: result.sourceSystemId,
     catalogAsOfDate: result.catalogAsOfDate,
     mappingFingerprint: result.mappingFingerprint,
+    mappingContentFingerprint: result.mappingContentFingerprint,
     reportCount: result.reportCount,
     sourceTotals: result.sourceTotals,
     knownIdentitiesReused: result.knownIdentitiesReused,
@@ -267,6 +333,7 @@ function validateCatalogs(catalogs, sourceSystemId) {
     ...catalogCollisions("Source classification", classifications, row => row.sourceClassificationKey),
   ];
   return {
+    sourceSystemId,
     restaurants,
     products,
     classifications,
@@ -276,6 +343,7 @@ function validateCatalogs(catalogs, sourceSystemId) {
     catalogAsOfDate: requiredText(catalogs.catalogAsOfDate, "CatalogAsOfDate"),
     catalogAsOfExcelSerial: finiteNumber(catalogs.catalogAsOfExcelSerial, "CatalogAsOfExcelSerial"),
     mappingFingerprint: requiredText(catalogs.mappingFingerprint, "mapping fingerprint"),
+    declaredMappingContentFingerprint: String(catalogs.mappingContentFingerprint ?? "").trim(),
   };
 }
 
@@ -581,8 +649,7 @@ function fingerprintPreflight({
   coverage,
   sourceTotals,
 }) {
-  const catalogRecords = [
-    record("CATALOG", [catalogs.catalogAsOfDate, catalogs.catalogAsOfExcelSerial, catalogs.mappingFingerprint]),
+  const catalogEntityRecords = [
     ...catalogs.restaurants.map(row => record("RESTAURANT", [
       row.restaurantId,
       row.sourceSystemId,
@@ -613,11 +680,19 @@ function fingerprintPreflight({
       row.scopeType,
       row.nodeId,
       row.targetReportingGroupId,
-      row.effectiveFrom,
-      row.effectiveTo,
+      canonicalRuleBoundary(row.effectiveFrom),
+      canonicalRuleBoundary(row.effectiveTo),
       row.status,
-      row.ruleAction,
+      canonicalRuleAction(row.ruleAction),
     ])),
+  ].sort(compareText);
+  const catalogRecords = [
+    record("CATALOG", [catalogs.catalogAsOfDate, catalogs.catalogAsOfExcelSerial, catalogs.mappingFingerprint]),
+    ...catalogEntityRecords,
+  ].sort(compareText);
+  const catalogContentRecords = [
+    record("CATALOG_CONTENT", [catalogs.mappingContentFingerprint]),
+    ...catalogEntityRecords,
   ].sort(compareText);
   const candidateRecords = [
     ...restaurantCandidates.map(row => record("RESTAURANT", [
@@ -676,20 +751,34 @@ function fingerprintPreflight({
     const metric = finalizeMetric(coverage[state]);
     return record("COVERAGE", [state, metric.factCount, metric.salesNok.toFixed(2), metric.quantity.toFixed(6)]);
   });
+  const catalogFingerprint = hashStrings(catalogRecords, "IDC-");
+  const catalogContentFingerprint = hashStrings(catalogContentRecords, "ICC-");
   return {
     sourceCorpusFingerprint: corpusFingerprint,
-    catalogFingerprint: hashStrings(catalogRecords, "IDC-"),
+    catalogFingerprint,
+    catalogContentFingerprint,
     candidateFingerprint: hashStrings(candidateRecords, "IDN-"),
     reviewFingerprint: hashStrings(reviewRecords, "IDR-"),
     preflightFingerprint: hashStrings([
       corpusFingerprint,
-      hashStrings(catalogRecords, "IDC-"),
+      catalogContentFingerprint,
       hashStrings(candidateRecords, "IDN-"),
       hashStrings(reviewRecords, "IDR-"),
       ...coverageRecords,
       record("SOURCE", [sourceTotals.factCount, sourceTotals.salesNok.toFixed(2), sourceTotals.quantity.toFixed(6)]),
     ], "IDP-"),
   };
+}
+
+function canonicalRuleBoundary(value) {
+  const converted = Number(value);
+  return value === null || value === undefined || value === "" || !Number.isFinite(converted)
+    ? 0
+    : converted;
+}
+
+function canonicalRuleAction(value) {
+  return String(value ?? "").trim() || "Map";
 }
 
 function mappingFields(value) {

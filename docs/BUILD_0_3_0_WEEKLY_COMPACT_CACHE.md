@@ -16,12 +16,14 @@ non-authoritative.
 ## Candidate contract
 
 The build is a pure, all-or-nothing in-memory operation. It first requires the
-accepted identity-preflight fingerprint plus the exact current mapping
-fingerprint and MappingAsOfDate. A difference fails visibly before analytical
-rows are returned. A candidate with the same version as an already active cache
-cannot overwrite it.
+accepted identity-preflight fingerprint plus the exact current date-neutral
+MappingContentFingerprint. A content difference fails visibly before
+analytical rows are returned. MappingAsOfDate and the existing date-sensitive
+Phase 2A fingerprint remain separate audit metadata and do not stale an
+otherwise identical weekly candidate. A candidate with the same version as an
+already active cache cannot overwrite it.
 
-The candidate version is `WCV-2cd012763d86a794`. It is recorded as `Candidate`
+The candidate version is `WCV-1a34ad1f46763d9b`. It is recorded as `Candidate`
 and `Not Active`; no active Performance model consumes it.
 Reporting Group membership is fingerprinted by active stable RPG IDs. Editing a
 display name or sort order does not change cache grain or numeric membership.
@@ -71,9 +73,10 @@ The two Test Department identities remain separate and ineligible.
 The period/source manifest contains one row per accepted week with its period,
 source identities/fingerprints, scope contract, source totals, and source
 restaurant count. The cache-version manifest holds version status, schema and
-source contract versions, the corpus/preflight/catalog/mapping/group/scope/cache
-fingerprints, MappingAsOfDate, and row counts. These values are not duplicated
-onto every analytical row.
+source contract versions, the corpus/preflight/catalog/mapping-content/group/
+scope/cache fingerprints, the date-sensitive audit mapping fingerprint,
+MappingAsOfDate, and row counts. These values are not duplicated onto every
+analytical row.
 
 ## Identity and mapping behavior
 
@@ -101,16 +104,24 @@ onto every analytical row.
 | Nonzero weekly RPG rows | 11,688 |
 | Analytical rows (scope + RPG) | 14,210 |
 | Complete rows including manifests | 14,295 |
-| Candidate cells | 136,359 |
+| Candidate cells | 136,361 |
 
 Deterministic fingerprints:
 
-- cache version: `WCV-2cd012763d86a794`;
-- cache contents: `WCC-7bd0c5f845b2a36d`;
+- cache version: `WCV-1a34ad1f46763d9b`;
+- cache contents: `WCC-508dd608166cdb6e`;
 - source corpus: `WSC-349b8bfd096ace2e`;
-- identity preflight: `IDP-4cd1159238339096`;
-- mapping: `MAP-342029f71a922b47` as of `2026-08-12`; and
+- identity preflight: `IDP-062c182f23905ae8`;
+- mapping content: `MCF-759cc92c4304a913`;
+- Phase 2A audit mapping: `MAP-34202a7a1a922bd0` as of `2026-08-12`; and
 - shared enabled-restaurant scope: `RSC-08df626f217dd94b`.
+
+The content fingerprint serializes Reporting Groups, Mapping Rules, Product
+hierarchy, and Effective Mapping outcomes, but not MappingAsOfDate itself. Rule
+effective boundaries remain content. Therefore a rule or resolved membership
+change invalidates the cache, while the proven 2026-08-11 to 2026-08-12
+date-only advance leaves `MCF-759cc92c4304a913` unchanged. The Phase 2A/2B
+`PULSE-MAPPING-SEMANTIC-V2` contract is unchanged.
 
 ## Reconciliation
 
@@ -172,21 +183,18 @@ The command requires one exact fixture corpus path and explicit accepted state:
 ```text
 node src/imports/audit-weekly-compact-cache.mjs <exact-read-only-corpus-path> \
   --catalog tests/fixtures/build-0.3.0-weekly-identity-catalog.json \
-  --mapping-fingerprint MAP-342029f71a922b47 \
-  --mapping-as-of-date 2026-08-12 \
-  --preflight-fingerprint IDP-4cd1159238339096 \
+  --mapping-content-fingerprint MCF-759cc92c4304a913 \
+  --preflight-fingerprint IDP-062c182f23905ae8 \
   --expected tests/expected-build-0.3.0-weekly-compact-cache.json
 ```
 
 It reads fixtures and emits JSON only. It never searches for reports, changes a
 source file, writes a workbook, or activates a cache.
 
-## Next live Excel boundary
+## Excel materialization boundary
 
-No live Excel action is required for this repository-only slice. A separately
-approved materialization step must first read the connected canonical
-`Pulse_Current.xlsx`, verify its exact current catalog/mapping date and
-fingerprint, and fail before writing if stale. It should write a complete
-candidate version to new bounded tables, validate the frozen counts and
-reconciliations, leave it inactive, prove the existing Phase 2C 16/16 QA and
-Performance results unchanged, and only then expose it for human review.
+The separately bounded materialization contract is documented in
+`BUILD_0_3_0_WEEKLY_CACHE_MATERIALIZATION.md`. It writes the exact candidate to
+four tables on one hidden engineering sheet, validates the live date-neutral
+mapping/catalog state and complete frozen evidence, and leaves the cache
+inactive. This does not authorize a Performance cutover or period selectors.

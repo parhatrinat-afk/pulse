@@ -91,6 +91,7 @@ function buildCheckpoint(summary) {
     contract_version: summary.contractVersion,
     status: summary.status,
     source_system_id: summary.sourceSystemId,
+    mapping_content_fingerprint: summary.mappingContentFingerprint,
     report_count: summary.reportCount,
     source: snakeMetric(summary.sourceTotals),
     known_reused: {

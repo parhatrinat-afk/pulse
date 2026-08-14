@@ -5,6 +5,7 @@ import {
   IDENTITY_PENDING,
   TEST_DEPARTMENT_SOURCE_NAMES,
   buildWeeklyIdentityPreflight,
+  deriveWeeklyMappingContentFingerprint,
 } from "../src/imports/weekly-identity-preflight.mjs";
 import {
   WEEKLY_SALES_HEADERS,
@@ -12,6 +13,7 @@ import {
 } from "../src/imports/weekly-sales-parser.mjs";
 
 const expectedPath = new URL("./expected-build-0.3.0-weekly-identity.json", import.meta.url);
+const catalogPath = new URL("./fixtures/build-0.3.0-weekly-identity-catalog.json", import.meta.url);
 const preflightPath = new URL("../src/imports/weekly-identity-preflight.mjs", import.meta.url);
 const auditPath = new URL("../src/imports/audit-weekly-identity-preflight.mjs", import.meta.url);
 
@@ -175,6 +177,64 @@ test("candidate allocation and identity are independent of locator and input row
   assert.notEqual(normal.manifest.sourceLocator, banana.manifest.sourceLocator);
 });
 
+test("weekly mapping content is identical for the proven 2026-08-11 and 2026-08-12 states", async () => {
+  const accepted = JSON.parse(await readFile(catalogPath, "utf8"));
+  const august11 = {
+    ...accepted,
+    catalogAsOfDate: "2026-08-11",
+    catalogAsOfExcelSerial: 46245,
+    mappingFingerprint: "MAP-342029f71a922b47",
+  };
+  const august12 = {
+    ...accepted,
+    catalogAsOfDate: "2026-08-12",
+    catalogAsOfExcelSerial: 46246,
+    mappingFingerprint: "MAP-34202a7a1a922bd0",
+  };
+  const first = deriveWeeklyMappingContentFingerprint(august11);
+  const second = deriveWeeklyMappingContentFingerprint(august12);
+
+  assert.equal(first, accepted.mappingContentFingerprint);
+  assert.equal(second, accepted.mappingContentFingerprint);
+  assert.equal(first, second);
+  assert.notEqual(august11.mappingFingerprint, august12.mappingFingerprint);
+});
+
+test("preflight identity is date-neutral while retaining date-sensitive audit metadata", () => {
+  const report = parsedReport([
+    row("Known Restaurant", "Main A", "Sub A", "Known Product", 1, 100),
+  ]);
+  const august11 = fixtureCatalog();
+  august11.catalogAsOfDate = "2026-08-11";
+  august11.catalogAsOfExcelSerial = 46245;
+  august11.mappingFingerprint = "MAP-date-sensitive-11";
+  const august12 = fixtureCatalog();
+  august12.mappingFingerprint = "MAP-date-sensitive-12";
+  const first = buildWeeklyIdentityPreflight({ parsedReports: [report], catalogs: august11 });
+  const second = buildWeeklyIdentityPreflight({ parsedReports: [report], catalogs: august12 });
+
+  assert.equal(first.mappingContentFingerprint, second.mappingContentFingerprint);
+  assert.equal(first.fingerprints.catalogContentFingerprint,
+    second.fingerprints.catalogContentFingerprint);
+  assert.equal(first.fingerprints.preflightFingerprint,
+    second.fingerprints.preflightFingerprint);
+  assert.notEqual(first.fingerprints.catalogFingerprint, second.fingerprints.catalogFingerprint);
+});
+
+test("an effective-rule outcome change still changes mapping content", () => {
+  const before = fixtureCatalog();
+  before.catalogAsOfDate = "2026-08-11";
+  before.catalogAsOfExcelSerial = 46245;
+  before.mappingRules[0].effectiveFrom = 46246;
+  const after = fixtureCatalog();
+  after.mappingRules[0].effectiveFrom = 46246;
+
+  assert.notEqual(
+    deriveWeeklyMappingContentFingerprint(before),
+    deriveWeeklyMappingContentFingerprint(after),
+  );
+});
+
 test("an accepted exact candidate catalog is idempotently reused on rerun", () => {
   const report = parsedReport([
     row("New Restaurant", "New Main", "New Sub", "New Product", 1, 100),
@@ -224,6 +284,9 @@ test("frozen 84-week identity evidence records the exact candidate contract", as
   });
   assert.equal(expected.new_candidates.products, 193);
   assert.equal(expected.new_candidates.classifications, 19);
+  assert.equal(expected.mapping_content_fingerprint, "MCF-759cc92c4304a913");
+  assert.equal(expected.fingerprints.catalogContentFingerprint, "ICC-5644a77c18a97437");
+  assert.equal(expected.fingerprints.preflightFingerprint, "IDP-062c182f23905ae8");
   assert.equal(expected.identity_pending_count, 6);
   assert.deepEqual(expected.hierarchy_review_product_ids, [
     "PRD-000689",

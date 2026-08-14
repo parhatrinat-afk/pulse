@@ -27,8 +27,7 @@ import {
 
 const root = requiredPositionalPath(process.argv[2]);
 const catalogPath = requiredFlagPath("--catalog");
-const expectedMappingFingerprint = requiredFlagValue("--mapping-fingerprint");
-const expectedMappingAsOfDate = requiredFlagValue("--mapping-as-of-date");
+const expectedMappingContentFingerprint = requiredFlagValue("--mapping-content-fingerprint");
 const expectedPreflightFingerprint = requiredFlagValue("--preflight-fingerprint");
 const expectedPath = optionalFlagValue("--expected");
 const checkpointOnly = process.argv.includes("--checkpoint-only");
@@ -53,8 +52,7 @@ const catalogs = JSON.parse(await readFile(path.resolve(catalogPath), "utf8"));
 const cache = buildCandidateWeeklyCache({
   parsedReports,
   catalogs,
-  expectedMappingFingerprint,
-  expectedMappingAsOfDate,
+  expectedMappingContentFingerprint,
   expectedIdentityPreflightFingerprint: expectedPreflightFingerprint,
 });
 const comparisons = [
@@ -159,6 +157,7 @@ function buildCheckpoint(summary) {
     status: summary.status,
     cache_version: summary.versionManifest.cacheVersion,
     cache_fingerprint: summary.versionManifest.cacheFingerprint,
+    mapping_content_fingerprint: summary.versionManifest.mappingContentFingerprint,
     mapping_fingerprint: summary.versionManifest.mappingFingerprint,
     mapping_as_of_date: summary.versionManifest.mappingAsOfDate,
     source_corpus_fingerprint: summary.versionManifest.sourceCorpusFingerprint,

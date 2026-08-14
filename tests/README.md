@@ -73,8 +73,14 @@ The candidate compact weekly cache suite validates deterministic candidate
 versioning and row IDs, one denominator per Restaurant/week, dense nine-RPG
 numerators, all five mapping/identity states, Test Department scope exclusion,
 current Product-hierarchy authority, stale-state rejection, complete weekly and
-range aggregation, and the frozen 84-week reconciliation checkpoint. The cache
-remains repository/test-space evidence and is not materialized or activated.
+range aggregation, and the frozen 84-week reconciliation checkpoint.
+
+The Excel materialization suite validates the four explicit hidden-table
+schemas, bounded chunk geometry, inactive/idempotent staging contract,
+date-neutral live freshness gate, Excel date canonicalization, exact frozen
+row counts, five-state reconciliation, range fixtures, Phase 2C isolation, and
+Office Scripts compiler/performance guards. Materialization remains inactive;
+Performance still does not consume the weekly cache.
 
 For Build 0.3.0, tests should cover at minimum:
 

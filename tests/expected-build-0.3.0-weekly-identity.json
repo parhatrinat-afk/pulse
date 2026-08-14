@@ -2,6 +2,7 @@
   "contract_version": "0.3.0-weekly-identity-preflight-v1",
   "status": "PASS WITH REVIEW",
   "source_system_id": "SRC-TEST-SALES",
+  "mapping_content_fingerprint": "MCF-759cc92c4304a913",
   "report_count": 84,
   "source": {
     "fact_count": 245632,
@@ -86,9 +87,10 @@
   "duplicate_proposed_stable_keys": [],
   "fingerprints": {
     "sourceCorpusFingerprint": "WSC-349b8bfd096ace2e",
-    "catalogFingerprint": "IDC-56484a052b6a4cab",
+    "catalogFingerprint": "IDC-1aaa7b197f3b57f6",
+    "catalogContentFingerprint": "ICC-5644a77c18a97437",
     "candidateFingerprint": "IDN-4803e1706372df44",
     "reviewFingerprint": "IDR-5eb0d5643dc88499",
-    "preflightFingerprint": "IDP-4cd1159238339096"
+    "preflightFingerprint": "IDP-062c182f23905ae8"
   }
 }

@@ -1,12 +1,13 @@
 {
   "schema_version": "0.3.0-weekly-compact-cache-v1",
   "status": "PASS",
-  "cache_version": "WCV-2cd012763d86a794",
-  "cache_fingerprint": "WCC-7bd0c5f845b2a36d",
-  "mapping_fingerprint": "MAP-342029f71a922b47",
+  "cache_version": "WCV-1a34ad1f46763d9b",
+  "cache_fingerprint": "WCC-508dd608166cdb6e",
+  "mapping_content_fingerprint": "MCF-759cc92c4304a913",
+  "mapping_fingerprint": "MAP-34202a7a1a922bd0",
   "mapping_as_of_date": "2026-08-12",
   "source_corpus_fingerprint": "WSC-349b8bfd096ace2e",
-  "identity_preflight_fingerprint": "IDP-4cd1159238339096",
+  "identity_preflight_fingerprint": "IDP-062c182f23905ae8",
   "performance_restaurant_scope_fingerprint": "RSC-08df626f217dd94b",
   "counts": {
     "periodRows": 84,
@@ -304,9 +305,9 @@
     "periodColumns": 16,
     "scopeColumns": 23,
     "rpgColumns": 8,
-    "versionColumns": 20,
-    "totalCells": 136359,
-    "inMemoryJsonBytes": 4199516,
+    "versionColumns": 22,
+    "totalCells": 136361,
+    "inMemoryJsonBytes": 4199618,
     "estimatedAdditionalXlsxMegabytes": {
       "low": 0.76,
       "high": 2.31

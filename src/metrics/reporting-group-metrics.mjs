@@ -15,6 +15,7 @@ export const MAPPING_STATES = Object.freeze([
 
 const MAPPING_STATE_SET = new Set(MAPPING_STATES);
 const FINGERPRINT_VERSION = "PULSE-MAPPING-SEMANTIC-V2";
+export const MAPPING_CONTENT_FINGERPRINT_VERSION = "PULSE-MAPPING-CONTENT-V1";
 
 export function computeMappingFingerprint({
   asOfDate,
@@ -65,8 +66,72 @@ export function computeMappingFingerprint({
   return hashRecords(records);
 }
 
+/**
+ * Date-neutral identity of the authoritative mapping content used by the
+ * weekly cache. MappingAsOfDate is deliberately excluded: advancing the audit
+ * date without changing rules or effective outcomes must not stale a cache.
+ * Rule effective boundaries remain content, and Effective Mapping membership
+ * is included so a rule becoming applicable still changes this fingerprint.
+ *
+ * PULSE-MAPPING-SEMANTIC-V2 above remains unchanged for Phase 2A/2B.
+ */
+export function computeMappingContentFingerprint({
+  groups,
+  rules,
+  products,
+  resolutions,
+}) {
+  const records = [record("V", [MAPPING_CONTENT_FINGERPRINT_VERSION])];
+
+  for (const group of groups) {
+    records.push(record("G", [
+      group.reportingGroupId ?? group.id,
+      group.reportingGroupName ?? group.name,
+      group.active,
+      group.sortOrder,
+    ]));
+  }
+
+  for (const rule of rules) {
+    records.push(record("R", [
+      rule.mappingRuleId ?? rule.id,
+      rule.sourceSystemId,
+      rule.scopeType,
+      rule.nodeId,
+      normalizeRuleAction(rule),
+      rule.targetReportingGroupId ?? rule.targetGroupId,
+      canonicalRuleBoundary(rule.effectiveFrom),
+      canonicalRuleBoundary(rule.effectiveTo),
+      rule.status,
+    ]));
+  }
+
+  for (const product of products) {
+    records.push(record("P", [
+      product.productId,
+      product.sourceSystemId,
+      product.mainNodeId,
+      product.subNodeId,
+    ]));
+  }
+
+  for (const resolution of resolutions) {
+    records.push(record("E", contentResolutionSignature(resolution)));
+  }
+
+  records.sort();
+  return hashRecords(records, "MCF-");
+}
+
 function normalizeRuleAction(rule) {
   return String(rule.ruleAction ?? rule.action ?? "").trim() || "Map";
+}
+
+function canonicalRuleBoundary(value) {
+  const converted = Number(value);
+  return value === null || value === undefined || value === "" || !Number.isFinite(converted)
+    ? 0
+    : converted;
 }
 
 export function validateEffectiveMappingFreshness({
@@ -452,6 +517,17 @@ function resolutionSignature(row) {
   ];
 }
 
+function contentResolutionSignature(row) {
+  return [
+    row.productId,
+    row.effectiveReportingGroupId ?? row.effectiveGroupId,
+    row.resolutionSource,
+    row.resolutionState,
+    row.resolutionStatus,
+    normalizeDelimited(row.winningRuleId ?? row.ruleId),
+  ];
+}
+
 function normalizeDelimited(value) {
   const items = String(value ?? "")
     .split(",")
@@ -474,7 +550,7 @@ function normalize(value) {
   return String(value).trim();
 }
 
-function hashRecords(records) {
+function hashRecords(records, prefix = "MAP-") {
   let left = 0;
   let right = 0;
   for (const item of records) {
@@ -485,7 +561,7 @@ function hashRecords(records) {
       right = (right * 137 + code) % 2147483629;
     }
   }
-  return `MAP-${left.toString(16).padStart(8, "0")}${right.toString(16).padStart(8, "0")}`;
+  return `${prefix}${left.toString(16).padStart(8, "0")}${right.toString(16).padStart(8, "0")}`;
 }
 
 function inScope(row, scope) {

@@ -4,8 +4,10 @@
 
 - [x] Uses the accepted weekly parser and accepted identity preflight.
 - [x] Uses the existing Pulse hierarchical resolver/current Product hierarchy.
-- [x] Requires exact mapping fingerprint, MappingAsOfDate, and accepted
+- [x] Requires exact date-neutral MappingContentFingerprint and accepted
   preflight fingerprint before candidate construction.
+- [x] Keeps MappingAsOfDate and the Phase 2A/2B mapping fingerprint as audit
+  metadata without treating a date-only advance as stale weekly content.
 - [x] Produces a candidate version only; it cannot overwrite an active version.
 - [x] Weekly scope grain is CacheVersion × SourcePeriodKey × RestaurantID.
 - [x] Weekly RPG grain is CacheVersion × SourcePeriodKey × RestaurantID ×
@@ -30,8 +32,9 @@
 
 ## Frozen checkpoint
 
-- Cache version: `WCV-2cd012763d86a794`
-- Cache fingerprint: `WCC-7bd0c5f845b2a36d`
+- Mapping content fingerprint: `MCF-759cc92c4304a913`
+- Cache version: `WCV-1a34ad1f46763d9b`
+- Cache fingerprint: `WCC-508dd608166cdb6e`
 - Period / scope / dense RPG rows: `84 / 1,421 / 12,789`
 - Complete candidate rows: `14,295`
 - Complete source: `245,632` facts / `484,728,367.25` Sales NOK /
@@ -41,7 +44,8 @@
 ## Future materialization gate (not implemented)
 
 - [ ] Connected workbook is exactly `OneDrive/Pulse/Development/Pulse_Current.xlsx`.
-- [ ] Live catalogs, MappingAsOfDate, and mapping fingerprint match the candidate.
+- [ ] Live MappingContentFingerprint matches the candidate; MappingAsOfDate and
+  the Phase 2A mapping fingerprint are recorded separately for audit.
 - [ ] New candidate tables are written completely and remain inactive.
 - [ ] Workbook rows/counts/fingerprint/reconciliation match frozen evidence.
 - [ ] Phase 2C Interaction QA remains 16/16 PASS and active Performance is unchanged.

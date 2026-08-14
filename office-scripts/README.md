@@ -52,6 +52,10 @@ Current scripts include:
   the exact seven-column schema, returns normalized source rows and a
   filename-independent manifest, and performs no staging, publication, mapping,
   cache, or workbook mutation.
+- `Materialize_Weekly_Compact_Cache.ts` — validates the accepted date-neutral
+  weekly mapping/catalog state, writes the deterministic 84-week compact cache
+  through hidden staging, reconciles/fingerprints the complete candidate, and
+  leaves it `Candidate` / `Not Active`. It does not cut Performance over.
 
 Build 0.3.0 scripts should preserve the existing workbook unless an explicit migration is required. They must not rewrite raw imported source data as part of mapping.
 

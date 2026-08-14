@@ -3,7 +3,8 @@
   "sourceSystemId": "SRC-TEST-SALES",
   "catalogAsOfDate": "2026-08-12",
   "catalogAsOfExcelSerial": 46246,
-  "mappingFingerprint": "MAP-342029f71a922b47",
+  "mappingFingerprint": "MAP-34202a7a1a922bd0",
+  "mappingContentFingerprint": "MCF-759cc92c4304a913",
   "restaurants": [
     {
       "restaurantId": "RST-0001",
