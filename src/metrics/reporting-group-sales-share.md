@@ -32,7 +32,7 @@ The validated presentation is all-channel. Channel remains bridge/fact
 metadata and a future optional scope dimension; it is not part of KPI-0001's
 identity.
 
-## Central result layer
+## Fixed-import central result layer
 
 `tblMetricRPGResults` is materialized on `_Metric_Calc` with one row per:
 
@@ -48,9 +48,25 @@ enabled RestaurantIDs. A configuration change therefore changes the auditable
 Company scope identity without changing source facts. Restaurant rows retain
 their own RestaurantID and leave the combined-scope fingerprint blank.
 
-Performance reads `MetricValue` and `NumeratorSalesNOK` from this table. It no
-longer filters `_Sales_Facts[ReportingCategoryID]`. Reports preserves its
-existing linkage to Performance and therefore presents the same result.
+Phase 2B/2C originally read `MetricValue` and `NumeratorSalesNOK` from this
+table rather than filtering `_Sales_Facts[ReportingCategoryID]`. The table now
+remains intact as regression/rollback evidence after the weekly Performance
+cutover.
+
+## Active weekly Performance source
+
+Active Performance uses the single fresh validated weekly cache. For each
+selected complete ISO-week range it aggregates `MappedSalesNOK` from
+`tblWeeklyRPGCache` and `SourceSalesNOK` from `tblWeeklyScopeCache` before
+calculating KPI-0001. The accepted Phase 2C restaurant/RPG selection, Total,
+Grand Total, NOK Impact, sorting, detail result, and presentation facade remain
+unchanged. Reports continues to link to Performance and therefore follows the
+same selected weekly periods.
+
+The weekly freshness gate uses MappingContentFingerprint plus approved
+catalog/identity and ReportingEnabled restaurant-scope fingerprints. It does
+not use MappingAsOfDate alone. `tblMetricRPGResults` is not read by the active
+weekly component matrices.
 
 ## Freshness and lineage
 

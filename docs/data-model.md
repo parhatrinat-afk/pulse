@@ -82,6 +82,10 @@ presentation choice between independently materialized ImportIDs rather than a
 property of a result row. ChannelScope is explicitly All channels for the
 validated Phase 2B presentation.
 
+After the weekly Performance cutover, `tblMetricRPGResults` remains the intact
+fixed-import regression/rollback layer. Active Performance does not delete,
+rewrite, or parse this table.
+
 ### Performance Interaction Selection
 
 Phase 2C stores user-facing Include state by stable RestaurantID and
@@ -92,20 +96,23 @@ it is a subset. Selection state is authoritative; All versus Custom is derived,
 not user-selected. Existing choices survive refresh by ID, while a newly
 eligible ID defaults to No after the catalog already exists.
 
-The interaction layer derives combined results from Phase 2B Restaurant-scope
-additive components. It does not add rows to `tblMetricRPGResults`; Company rows
-remain the control for the all-eligible scope.
+The interaction layer preserves one additive component contract. The original
+fixed-import path derives those components from Phase 2B Restaurant results;
+the active weekly path derives them from weekly RPG/scope cache sums. It does
+not add rows to `tblMetricRPGResults`; Company rows remain fixed-import controls
+for regression and rollback.
 
 The Phase 2C Total and sorting surfaces are derived formula state only. Total
 stores selected-RPG current/comparison numerators, one denominator for each
-dataset scope, and a numeric selected-display value. Sorting stores a numeric
-key and a presentation-order RestaurantID list. Neither surface changes the
-canonical component row keyed by RestaurantID or becomes a metric-result table.
+selected period scope, and a numeric selected-display value. Sorting stores a
+numeric key and a presentation-order RestaurantID list. Neither surface changes
+the canonical component row keyed by RestaurantID or becomes a metric-result
+table.
 
-### Candidate Weekly Analytical Cache
+### Weekly Analytical Cache
 
-The Build 0.3.0 weekly candidate is versioned derived state, not a replacement
-for source reports, published facts, Mapping, or active Phase 2B results. Its
+The Build 0.3.0 weekly cache is versioned derived state, not a replacement
+for source reports, published facts, Mapping, or retained Phase 2B results. Its
 scope table has one row per CacheVersion, SourcePeriodKey, and RestaurantID and
 stores the source denominator plus Mapped, Unmapped, Identity Pending, Conflict,
 and Inactive Target additive components. Its RPG table adds ReportingGroupID and
@@ -119,8 +126,22 @@ fingerprints. MappingAsOfDate and the existing Phase 2A mapping fingerprint are
 retained separately as audit metadata. Weekly cache staleness is driven by the
 date-neutral MappingContentFingerprint, so a date-only advance does not
 invalidate unchanged mapping content. Candidate validation and activation are
-separate states; this slice does not activate or connect the cache to
-Performance.
+separate states. Only one validated `Active` / `Active` version may supply the
+weekly Performance path.
+
+### Weekly Performance Period Selection
+
+Current and Compare each store ISO Year, From week, and To week as user-facing
+selection state. Generated summaries expose labels such as `2026 W01–W32` and
+never expose SourcePeriodKey or CacheVersion. Each requested week must exist in
+the active version's period manifest before the affected side is available.
+
+For each selected restaurant and Reporting Group, Performance sums weekly
+`MappedSalesNOK` from the RPG cache and sums weekly `SourceSalesNOK` once from
+the scope cache. The existing Phase 2C numeric components then calculate share,
+PP Change, Current Sales NOK, and NOK Impact. The visible matrix remains an
+isolated presentation facade. `tblMetricRPGResults` remains available for
+rollback but is not an input to these weekly component formulas.
 
 ## Import safety
 

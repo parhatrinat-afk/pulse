@@ -33,8 +33,10 @@ be applied consistently to current and comparison results.
 
 Phase 2C lets the user interactively choose any subset inside that eligible set.
 The same selected RestaurantIDs apply to both the current and comparison
-components, while the two ImportIDs remain independently selectable. Changing
-selection or either dataset is Excel recalculation, not a metric refresh.
+components. After the weekly cutover, Current and Compare independently select
+ISO Year, From week, and To week from the single fresh active weekly cache.
+Changing restaurant/RPG selection or either complete week range is Excel
+recalculation, not a metric refresh.
 The Performance Total column aggregates the currently selected Reporting
 Groups. PP Change and NOK Impact are recalculated from aggregate current and
 comparison components; they are not sums of displayed row percentages or
@@ -48,12 +50,15 @@ Pulse may identify factual differences such as:
 
 - different channel
 - different period length
-- same dataset selected on both sides
+- the same complete period selected on both sides
 - different organizational scope
 
-These are informational warnings.
+These are informational warnings and do not block calculation. Identical
+periods intentionally return zero PP Change and NOK Impact.
 
-They do not block the calculation.
+A requested range that is reversed, unavailable, or missing any required week
+is not merely an unusual comparison: the affected side is invalid/incomplete
+and its calculation is blocked rather than silently using a partial period.
 
 ## Why
 

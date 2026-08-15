@@ -1,7 +1,8 @@
 # reporting
 
 Build 0.3.0 Phase 2B preserves Reports as a presentation consumer of
-Performance and centralizes KPI-0001 in `tblMetricRPGResults`.
+Performance and centralizes the fixed-import KPI-0001 regression layer in
+`tblMetricRPGResults`.
 
 Phase 2C adds deterministic interaction primitives mirrored by workbook
 formulas. Restaurant and Reporting Group selection use stable IDs and direct
@@ -23,3 +24,12 @@ sorts Restaurant rows by the full-precision Total or RPG numeric value, retains
 unavailable values last, applies deterministic RestaurantID ties, and leaves
 Grand Total outside the ranking. These pure helpers mirror the workbook formula
 contract without changing canonical row identity.
+
+`weekly-performance.mjs` adds the bounded weekly Current/Compare contract. It
+requires the single fresh Active compact cache, rejects incomplete or invalid
+ISO-week ranges, and aggregates weekly RPG numerators and scope denominators
+before the unchanged Phase 2C metric math. Same ranges are allowed; different
+complete lengths are allowed with a factual warning. The workbook cutover uses
+this cache for the four additive component matrices while preserving the
+existing Phase 2C helpers and Reports linkage; `tblMetricRPGResults` remains
+rollback-only.

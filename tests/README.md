@@ -82,6 +82,19 @@ row counts, five-state reconciliation, range fixtures, Phase 2C isolation, and
 Office Scripts compiler/performance guards. Materialization remains inactive;
 Performance still does not consume the weekly cache.
 
+The weekly-cache activation suite validates the exact two-field authority
+transition, idempotent reruns, single-Active-version rule, full materialized
+cache/reconciliation preflight, date-neutral consumer freshness, deterministic
+stale responses for mapping/catalog/identity/ReportingEnabled changes, Phase 2C
+protection, and Office Scripts compatibility. Activation does not cut
+Performance over or introduce period selectors.
+
+The weekly Performance suite validates independent complete ISO-week ranges,
+blocked incomplete/invalid ranges, same- and different-length comparisons,
+accepted Add-ons fixtures, active-cache freshness, additive aggregation before
+shares, the four bounded component-block replacements, Reports linkage and
+preservation of the Phase 2C numeric/presentation architecture.
+
 For Build 0.3.0, tests should cover at minimum:
 
 - Reporting Group registry integrity.

@@ -23,11 +23,17 @@ Build 0.3.0 begins the bounded weekly source parser foundation here.
 - `audit-weekly-compact-cache.mjs` runs that candidate against one exact corpus
   path and explicit accepted mapping/preflight fingerprints. It emits evidence
   only; it does not materialize or activate a workbook cache.
+- `weekly-cache-activation.mjs` defines the two-field activation transition and
+  the minimum freshness guard future weekly consumers must pass. It treats
+  mapping content, catalog/identity content, ReportingEnabled scope and cache
+  QA as authority; date-only mapping audit changes are intentionally ignored.
 
-None of these foundations publishes weekly facts, activates the candidate
-cache, or supersedes legacy imports. The preflight may evaluate proposed
-ProductIDs through the existing mapping resolver, but it never creates mapping
-rules or treats identity creation as a business mapping decision.
+None of these foundations publishes weekly facts or supersedes legacy imports.
+Activation changes only the accepted cache-version authority; Performance does
+not consume the weekly cache until a separately approved cutover. The identity
+preflight may evaluate proposed ProductIDs through the existing mapping
+resolver, but it never creates mapping rules or treats identity creation as a
+business mapping decision.
 
 The weekly export has no encoded Channel/filter field. Scope is a human-owned
 manifest contract (`SCOPE-030-WEEKLY-SALES-PER-ITEM`), not an inference from

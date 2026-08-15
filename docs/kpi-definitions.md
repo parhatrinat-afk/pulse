@@ -3,7 +3,7 @@
 ## KPI-0001 — Reporting Group Sales Share
 
 **Domain:** Commercial Performance  
-**Status:** Build 0.3.0 Phase 2B implementation
+**Status:** Build 0.3.0 weekly Performance implementation
 
 ### Definition
 
@@ -69,11 +69,13 @@ A dataset or period becomes the baseline only when the user selects it as the co
 
 ### Presentation
 
-Build 0.3.0 Phase 2B implements the centralized materialized results. Phase 2C
-adds a formula-driven presentation over their additive Restaurant components:
+Build 0.3.0 Phase 2B implements the centralized fixed-import materialized
+results. Phase 2C adds the accepted formula-driven interaction and presentation
+contract. The weekly cutover preserves that contract while replacing the four
+current/comparison additive component sources with selected weekly-cache sums:
 
 - selected-Reporting-Group result
-- independent current/comparison datasets
+- independent current/comparison ISO week ranges
 - direct Yes/No eligible restaurant selection
 - direct Yes/No active Reporting Group matrix selection
 - Restaurant × Reporting Group matrix
@@ -133,6 +135,22 @@ set, it sums Phase 2B Restaurant-scope NumeratorSalesNOK and
 DenominatorSalesNOK, then divides the sums. This is mathematically equivalent to
 calculating KPI-0001 over the union of those disjoint restaurant scopes and is
 not an average of restaurant percentages.
+
+### Active weekly Performance calculation path
+
+Active Performance consumes only the single fresh validated weekly cache. For
+each independently selected complete ISO-week range, it sums
+`tblWeeklyRPGCache[MappedSalesNOK]` as the RPG numerator and
+`tblWeeklyScopeCache[SourceSalesNOK]` as the scope denominator, then applies the
+unchanged Phase 2C aggregation and display math. Percentages are calculated
+after weekly aggregation and are never averaged.
+
+`tblMetricRPGResults` and the fixed legacy imports remain intact for regression
+and rollback, but they are not authoritative inputs to the active weekly
+component formulas. Reports follows Performance's weekly summaries and detail
+result. Same complete ranges are allowed; complete ranges of different lengths
+are allowed with a factual warning; incomplete, unavailable, and reversed
+ranges are blocked on the affected side.
 
 ## Planned KPIs
 

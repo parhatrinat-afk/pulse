@@ -55,6 +55,10 @@ ReportingGroupID, and company/restaurant scope. Performance reads the
 centralized result rather than calculating directly from legacy CAT membership,
 and Reports retains its linkage to the same Performance result.
 
+After the weekly Performance cutover, this fixed-import result table remains an
+intact regression and rollback surface. It is no longer the authoritative input
+to the active Performance component matrices.
+
 The active calculation path no longer depends on ReportingCategoryID or
 CAT/RPG equivalence. Legacy CAT structures and human-authored equivalence remain
 available only for compatibility and migration QA. Unmapped, Conflict, Inactive
@@ -83,7 +87,8 @@ is derived from those rows, not exposed as a separate control. Formula helpers
 sum the selected Phase 2B Restaurant-row numerators and denominators; they do
 not read facts or rematerialize combinations.
 
-The selected scope applies identically to current and comparison datasets.
+The selected scope applies identically to current and comparison analysis
+periods.
 Share/PP Grand Total derives from summed selected numerators and denominators.
 NOK Impact subtracts aggregated comparison share × aggregated current
 denominator from the aggregated current numerator; it is never summed from
@@ -110,6 +115,32 @@ This interaction mechanism is KPI-independent as scope state, but the additive
 aggregation is valid for KPI-0001 specifically because its approved numerator
 and denominator are additive across disjoint restaurants. Future KPIs require
 their own approved component contract.
+
+## Active weekly Performance path
+
+The single validated `Active` / `Active` weekly cache is the authoritative
+Performance source after the weekly cutover:
+
+`Active weekly cache → independent Current/Compare week sets → aggregated RPG numerator and scope denominator → Phase 2C numeric helpers → Performance → Reports`
+
+Current and comparison each select ISO year, From week, and To week. Every
+requested week must exist in `tblWeeklyPeriodManifest`; incomplete, unavailable,
+or reversed ranges are labelled and blocked on the affected side. Complete
+ranges of different lengths and identical Current/Compare ranges remain
+allowed. Share is calculated only after additive weekly components are summed;
+weekly percentages are never averaged.
+
+The existing Phase 2C restaurant/RPG selection, Total, Grand Total, NOK Impact,
+sorting, detail result, and numeric-helper/text-facade contracts remain
+unchanged. Reports links to the same weekly-selected detail result and generated
+period summaries. Normal selection changes recalculate in Excel and do not
+require an Office Script rerun.
+
+Weekly consumers require exactly one validated active cache whose date-neutral
+MappingContentFingerprint, catalog/identity content, and ReportingEnabled
+restaurant-scope fingerprint still match the live catalogs. MappingAsOfDate is
+retained as audit metadata but does not by itself invalidate unchanged mapping
+content.
 
 ## Weekly source parser boundary
 
