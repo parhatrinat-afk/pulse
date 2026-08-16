@@ -65,6 +65,11 @@ Current scripts include:
   Phase 2C additive component inputs to weekly RPG/scope cache tables. Invalid
   or incomplete ranges are blocked while the accepted Phase 2C numeric,
   Total, Grand Total, sorting, detail and presentation layers remain intact.
+- `Build_0_3_0_Performance_Presentation_Cleanup.ts` — runs after the accepted
+  weekly Performance cutover, moves the two existing native selection tables
+  below Explain, balances matrix widths/alignment, and updates the obsolete
+  dataset wording. It fingerprints formulas, selections, validations, Reports,
+  rollback results, Imports, and both 16/16 QA surfaces before/after.
 
 Build 0.3.0 scripts should preserve the existing workbook unless an explicit migration is required. They must not rewrite raw imported source data as part of mapping.
 
