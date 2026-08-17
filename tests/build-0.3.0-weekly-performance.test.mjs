@@ -158,6 +158,11 @@ test("weekly cache replaces only Phase 2C additive component inputs", () => {
   assert.match(script, /"tblImports", rangeFingerprint\(requiredTable\(workbook, "tblImports"\)\.getRange\(\)\)/);
 });
 
+test("weekly component Grand Totals sum their own RPG columns without an offset", () => {
+  assert.match(script, /columnName\(startIndex \+ group\)/);
+  assert.doesNotMatch(script, /columnName\(startIndex \+ group \+ 1\)/);
+});
+
 test("Phase 2C numeric, Total, sorting, facade and selection formulas are not rewritten", () => {
   assert.doesNotMatch(script, /writeNumericDisplayBlock|writeTotalAndSortHelpers|matrixFacadeFormula|SORTBY\(/);
   assert.doesNotMatch(script, /tblPerformanceRestaurantSelection\[[^\]]+\].*set|tblPerformanceRPGSelection\[[^\]]+\].*set/);

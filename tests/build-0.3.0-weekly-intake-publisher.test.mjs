@@ -181,6 +181,34 @@ test("candidate version/fingerprint ignore filename and source row order", () =>
   assert.deepEqual(first.candidate.weeklyRpgCacheRows, second.candidate.weeklyRpgCacheRows);
 });
 
+test("incremental publication carries accepted exact identities across weeks", () => {
+  const catalog = fixtureCatalog();
+  const history = [report(2026, 1, [
+    sourceRow("Registry Product", 1, 100, "Main A", "Sub A"),
+  ])];
+  const incoming = report(2026, 2, [
+    sourceRow("Registry Product", 2, 200, "Main A", "Sub A"),
+  ]);
+  const active = buildActiveCache(history, catalog);
+  const acceptedProduct = active.identityPreflight.newIdentityCandidates.products[0];
+  const result = publish({ active, catalog, parsedReport: incoming });
+  const full = buildInactiveCache([...history, incoming], catalog);
+
+  assert.equal(result.outcome, "New");
+  assert.equal(result.candidate.identityPreflight.newIdentityCandidates.products.length, 0);
+  assert.equal(result.candidate.identityPreflight.rowAssignments[0].productId,
+    acceptedProduct.productId);
+  assert.equal(result.candidate.identityRegistry.products.length, 1);
+  assert.equal(result.candidate.identityRegistry.products[0].productId,
+    acceptedProduct.productId);
+  assert.deepEqual(withoutVersionedIds(result.candidate.scopeCacheRows,
+    "weeklyScopeCacheRowId"), withoutVersionedIds(full.scopeCacheRows,
+    "weeklyScopeCacheRowId"));
+  assert.deepEqual(withoutVersionedIds(result.candidate.weeklyRpgCacheRows,
+    "weeklyRpgCacheRowId"), withoutVersionedIds(full.weeklyRpgCacheRows,
+    "weeklyRpgCacheRowId"));
+});
+
 test("intake ledger stays minimal, operational and deterministic", () => {
   assert.deepEqual(WEEKLY_INTAKE_OUTCOMES, [
     "New", "Duplicate", "Correction Review", "Rejected", "Cache Stale",

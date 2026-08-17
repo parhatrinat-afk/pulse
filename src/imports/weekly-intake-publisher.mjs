@@ -15,6 +15,8 @@ import {
 import { buildWeeklyIdentityPreflight } from "./weekly-identity-preflight.mjs";
 
 export const WEEKLY_INTAKE_PUBLISHER_VERSION = "0.3.0-weekly-intake-publisher-v1";
+export const WEEKLY_INTAKE_IDENTITY_EVIDENCE_VERSION =
+  "0.3.0-weekly-intake-identity-evidence-v1";
 
 export const WEEKLY_INTAKE_OUTCOMES = Object.freeze([
   "New",
@@ -139,7 +141,12 @@ export function planWeeklyIntakePublication({
 
   let week;
   try {
-    week = buildOneWeekSlice(parsedReport, catalogs, currentFreshness);
+    week = buildOneWeekSlice(
+      parsedReport,
+      catalogs,
+      currentFreshness,
+      normalizedIdentityRegistry(active),
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const outcome = /stale|Fingerprint .* differs|MappingContentFingerprint/i.test(message)
@@ -220,12 +227,17 @@ export function planWeeklyFullVersionRetention({ versionManifests, candidateVers
   };
 }
 
-function buildOneWeekSlice(parsedReport, catalogs, currentFreshness) {
+function buildOneWeekSlice(parsedReport, catalogs, currentFreshness, acceptedIdentityRegistry) {
   const preliminary = buildCandidateWeeklyCache({
     parsedReports: [parsedReport],
     catalogs,
+    acceptedIdentityRegistry,
     expectedMappingContentFingerprint: currentFreshness.mappingContentFingerprint,
-    expectedIdentityPreflightFingerprint: buildExpectedOneWeekIdentity(parsedReport, catalogs),
+    expectedIdentityPreflightFingerprint: buildExpectedOneWeekIdentity(
+      parsedReport,
+      catalogs,
+      acceptedIdentityRegistry,
+    ),
     existingVersionManifests: [],
   });
   if (preliminary.versionManifest.catalogContentFingerprint !==
@@ -238,13 +250,14 @@ function buildOneWeekSlice(parsedReport, catalogs, currentFreshness) {
   return preliminary;
 }
 
-function buildExpectedOneWeekIdentity(parsedReport, catalogs) {
+function buildExpectedOneWeekIdentity(parsedReport, catalogs, acceptedIdentityRegistry) {
   // buildCandidateWeeklyCache performs the full preflight again. The first
   // pass is deliberately local and read-only so the accepted fingerprint is
   // an explicit input to its stale gate.
   const active = buildWeeklyIdentityPreflight({
     parsedReports: [parsedReport],
     catalogs,
+    acceptedIdentityRegistry,
   });
   return active.fingerprints.preflightFingerprint;
 }
@@ -256,7 +269,9 @@ function combineActiveCacheAndNewWeek({ active, week, versionManifests }) {
   const identityEvidence = normalizedIdentityEvidence(active);
   identityEvidence.push({
     evidenceKey: week.periodManifest[0].sourcePeriodKey,
-    identityPreflightFingerprint: week.versionManifest.identityPreflightFingerprint,
+    identityPreflightFingerprint: fingerprintWeeklyIntakeIdentityEvidence(
+      week.identityPreflight,
+    ),
   });
   identityEvidence.sort((left, right) => compareText(left.evidenceKey, right.evidenceKey));
   const identityPreflightFingerprint = hashStrings([
@@ -331,7 +346,106 @@ function combineActiveCacheAndNewWeek({ active, week, versionManifests }) {
     validation,
     identityPreflight: week.identityPreflight,
     identityEvidence,
+    identityRegistry: mergeIdentityRegistry(
+      normalizedIdentityRegistry(active),
+      week.identityPreflight.newIdentityCandidates,
+    ),
   };
+}
+
+function normalizedIdentityRegistry(active) {
+  const source = active?.identityRegistry ?? active?.identityPreflight?.newIdentityCandidates ?? {};
+  return {
+    restaurants: (source.restaurants ?? []).map(row => ({ ...row })),
+    classifications: (source.classifications ?? []).map(row => ({ ...row })),
+    products: (source.products ?? []).map(row => ({ ...row })),
+  };
+}
+
+function mergeIdentityRegistry(existing, candidates) {
+  return {
+    restaurants: mergeIdentityRows(existing.restaurants, candidates.restaurants, "restaurantId"),
+    classifications: mergeIdentityRows(
+      existing.classifications,
+      candidates.classifications,
+      "sourceClassificationId",
+    ),
+    products: mergeIdentityRows(existing.products, candidates.products, "productId"),
+  };
+}
+
+function mergeIdentityRows(existing, candidates, idField) {
+  const rows = [...(existing ?? []).map(row => ({ ...row }))];
+  const byId = new Map(rows.map(row => [row[idField], row]));
+  for (const candidate of candidates ?? []) {
+    const prior = byId.get(candidate[idField]);
+    if (prior && JSON.stringify(prior) !== JSON.stringify(candidate)) {
+      fail("PUL-030WIP-024", `Accepted identity ${candidate[idField]} changed.`);
+    }
+    if (!prior) {
+      const value = { ...candidate };
+      rows.push(value);
+      byId.set(value[idField], value);
+    }
+  }
+  return rows.sort((left, right) => compareText(left[idField], right[idField]));
+}
+
+/**
+ * Compact the accepted Identity Preflight into the exact evidence needed by
+ * incremental publication. The evidence fingerprints stable assignments and
+ * proposed identities, while the full human review remains in preflight QA.
+ * This contract is intentionally small enough to reproduce in Office Scripts.
+ */
+export function fingerprintWeeklyIntakeIdentityEvidence(preflight) {
+  if (!preflight || preflight.reconciliation?.status !== "PASS" ||
+      !Array.isArray(preflight.rowAssignments)) {
+    fail("PUL-030WIP-023", "Weekly identity evidence requires a reconciled preflight.");
+  }
+  const records = [record("CONTRACT", [WEEKLY_INTAKE_IDENTITY_EVIDENCE_VERSION])];
+  for (const row of preflight.rowAssignments) {
+    records.push(record("ASSIGNMENT", [
+      row.sourceRowId,
+      row.restaurantId,
+      row.productId,
+      row.sourceClassificationId,
+      row.identityState,
+      row.identityPendingReason,
+      row.mappingStatus,
+      row.effectiveReportingGroupId,
+    ]));
+  }
+  const candidates = preflight.newIdentityCandidates ?? {};
+  for (const row of candidates.restaurants ?? []) {
+    records.push(record("RESTAURANT_CANDIDATE", [
+      row.restaurantId,
+      row.sourceSystemId,
+      row.sourceRestaurantName,
+      row.status,
+      row.reportingEnabled,
+    ]));
+  }
+  for (const row of candidates.classifications ?? []) {
+    records.push(record("CLASSIFICATION_CANDIDATE", [
+      row.sourceClassificationId,
+      row.sourceSystemId,
+      row.sourceClassificationKey,
+      row.status,
+    ]));
+  }
+  for (const row of candidates.products ?? []) {
+    records.push(record("PRODUCT_CANDIDATE", [
+      row.productId,
+      row.sourceSystemId,
+      row.productKey,
+      row.sourceClassificationId,
+      row.productStatus,
+      row.hierarchyStatus,
+      ...(row.observedHierarchyPaths ?? []),
+    ]));
+  }
+  records.sort(compareText);
+  return hashStrings(records, "WIE-");
 }
 
 function requireActiveCacheSnapshot(cache, activeVersion) {

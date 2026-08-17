@@ -338,7 +338,7 @@ function writeWeeklyComponentBlock(
   calc.getRangeByIndexes(1, startIndex, RESTAURANT_CAPACITY, GROUP_CAPACITY).setFormulas(formulas);
   const totals: string[][] = [[]];
   for (let group = 0; group < GROUP_CAPACITY; group += 1) {
-    const column = columnName(startIndex + group + 1);
+    const column = columnName(startIndex + group);
     totals[0].push(`=SUM(${column}$2:${column}$17)`);
   }
   calc.getRangeByIndexes(17, startIndex, 1, GROUP_CAPACITY).setFormulas(totals);

@@ -4,8 +4,10 @@ import { readFile } from "node:fs/promises";
 import {
   IDENTITY_PENDING,
   TEST_DEPARTMENT_SOURCE_NAMES,
+  acceptedIdentityRegistryFromPreflight,
   buildWeeklyIdentityPreflight,
   deriveWeeklyMappingContentFingerprint,
+  fingerprintAcceptedIdentityRegistry,
 } from "../src/imports/weekly-identity-preflight.mjs";
 import {
   WEEKLY_SALES_HEADERS,
@@ -14,6 +16,7 @@ import {
 
 const expectedPath = new URL("./expected-build-0.3.0-weekly-identity.json", import.meta.url);
 const catalogPath = new URL("./fixtures/build-0.3.0-weekly-identity-catalog.json", import.meta.url);
+const registryPath = new URL("./fixtures/build-0.3.0-weekly-identity-registry.json", import.meta.url);
 const preflightPath = new URL("../src/imports/weekly-identity-preflight.mjs", import.meta.url);
 const auditPath = new URL("../src/imports/audit-weekly-identity-preflight.mjs", import.meta.url);
 
@@ -256,6 +259,48 @@ test("an accepted exact candidate catalog is idempotently reused on rerun", () =
   assert.equal(second.rowAssignments[0].productId, first.newIdentityCandidates.products[0].productId);
 });
 
+test("accepted identity registry reuses exact candidates without mutating the base catalog", () => {
+  const report = parsedReport([
+    row("New Restaurant", "New Main", "New Sub", "New Product", 1, 100),
+  ]);
+  const catalog = fixtureCatalog();
+  const first = buildWeeklyIdentityPreflight({ parsedReports: [report], catalogs: catalog });
+  const registry = acceptedIdentityRegistryFromPreflight(first);
+  const second = buildWeeklyIdentityPreflight({
+    parsedReports: [report], catalogs: catalog, acceptedIdentityRegistry: registry,
+  });
+
+  assert.deepEqual(second.newIdentityCandidates, {
+    restaurants: [], products: [], classifications: [],
+  });
+  assert.equal(second.rowAssignments[0].restaurantId,
+    first.newIdentityCandidates.restaurants[0].restaurantId);
+  assert.equal(second.rowAssignments[0].productId,
+    first.newIdentityCandidates.products[0].productId);
+  assert.deepEqual(catalog, fixtureCatalog());
+});
+
+test("accepted identity registry is deterministic and rejects collisions", () => {
+  const report = parsedReport([
+    row("New Restaurant", "New Main", "New Sub", "New Product", 1, 100),
+  ]);
+  const catalog = fixtureCatalog();
+  const preflight = buildWeeklyIdentityPreflight({ parsedReports: [report], catalogs: catalog });
+  const registry = acceptedIdentityRegistryFromPreflight(preflight);
+  const reversed = {
+    restaurants: [...registry.restaurants].reverse(),
+    classifications: [...registry.classifications].reverse(),
+    products: [...registry.products].reverse(),
+  };
+  assert.equal(fingerprintAcceptedIdentityRegistry(registry),
+    fingerprintAcceptedIdentityRegistry(reversed));
+  const collision = structuredClone(registry);
+  collision.products[0].productId = "PRD-000001";
+  assert.throws(() => buildWeeklyIdentityPreflight({
+    parsedReports: [report], catalogs: catalog, acceptedIdentityRegistry: collision,
+  }), /PUL-030I-111/);
+});
+
 test("identity and mapping states account for every row and reconcile all source measures", () => {
   const report = parsedReport([
     row("Known Restaurant", "Main A", "Sub A", "Known Product", 1.25, 100.1),
@@ -307,6 +352,18 @@ test("frozen 84-week identity evidence records the exact candidate contract", as
   assert.equal(expected.reconciliation_status, "PASS");
   assert.deepEqual(expected.duplicate_proposed_stable_ids, []);
   assert.deepEqual(expected.duplicate_proposed_stable_keys, []);
+});
+
+test("frozen accepted 84-week identity registry is explicit and fingerprinted", async () => {
+  const fixture = JSON.parse(await readFile(registryPath, "utf8"));
+  assert.equal(fixture.contractVersion, "0.3.0-weekly-identity-registry-v1");
+  assert.equal(fixture.identityPreflightFingerprint, "IDP-062c182f23905ae8");
+  assert.equal(fixture.registryFingerprint, "WIR-776953cb0144af11");
+  assert.deepEqual(fixture.counts, {
+    restaurants: 2, classifications: 19, products: 193,
+  });
+  assert.equal(fingerprintAcceptedIdentityRegistry(fixture.registry),
+    fixture.registryFingerprint);
 });
 
 test("preflight remains a read-only caller-supplied audit with no cache or workbook mutation", async () => {

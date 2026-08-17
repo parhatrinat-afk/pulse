@@ -102,6 +102,19 @@ Power-Automate routing results, Active-cache isolation, and Office Scripts
 compiler/performance compatibility. They do not implement a flow or activate a
 new cache.
 
+The New-week publication-runtime suite adds the separate inactive Candidate and
+activation calls, deterministic Published authority plan, prior-version
+rollback retention, retry idempotency, restore-on-write-failure guards, bounded
+canonical writes, compact incremental identity evidence, accepted exact-ID
+registry carry-forward, and strict isolation
+from facts, mapping/configuration, Performance, Reports and Imports. The
+read-only publication audit requires exact caller-supplied Active-corpus,
+incoming-report and catalog paths and independently compares business rows with
+a full rebuild. The frozen accepted 84-week registry is stored as derived
+evidence in `fixtures/build-0.3.0-weekly-identity-registry.json`; the W33
+85-week publication checkpoint is recorded in
+`expected-build-0.3.0-weekly-w33-publication.json`.
+
 For Build 0.3.0, tests should cover at minimum:
 
 - Reporting Group registry integrity.

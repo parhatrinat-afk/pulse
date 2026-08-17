@@ -47,6 +47,7 @@ const CACHE_STATE_FIELDS = Object.freeze({
 export function buildCandidateWeeklyCache({
   parsedReports,
   catalogs,
+  acceptedIdentityRegistry,
   expectedMappingContentFingerprint,
   expectedIdentityPreflightFingerprint,
   existingVersionManifests = [],
@@ -59,7 +60,11 @@ export function buildCandidateWeeklyCache({
   if (corpus.status !== "PASS") {
     fail("PUL-030C-001", "Weekly corpus manifest must pass before cache construction.");
   }
-  const preflight = buildWeeklyIdentityPreflight({ parsedReports, catalogs });
+  const preflight = buildWeeklyIdentityPreflight({
+    parsedReports,
+    catalogs,
+    acceptedIdentityRegistry,
+  });
   if (preflight.reconciliation.status !== "PASS") {
     fail("PUL-030C-002", "Weekly Identity Preflight must reconcile before cache construction.");
   }
@@ -389,13 +394,19 @@ function buildRestaurantRegistry(catalogs, preflight) {
     status: row.status,
     reportingEnabled: row.reportingEnabled,
   }));
+  const accepted = (preflight.acceptedIdentityRegistry?.restaurants ?? []).map(row => ({
+    restaurantId: row.restaurantId,
+    sourceRestaurantName: row.sourceRestaurantName,
+    status: row.status,
+    reportingEnabled: row.reportingEnabled,
+  }));
   const candidates = preflight.newIdentityCandidates.restaurants.map(row => ({
     restaurantId: row.restaurantId,
     sourceRestaurantName: row.sourceRestaurantName,
     status: row.status,
     reportingEnabled: row.reportingEnabled,
   }));
-  const result = [...current, ...candidates].map(row => ({
+  const result = [...current, ...accepted, ...candidates].map(row => ({
     ...row,
     performanceEligible: row.status === "Active" && row.reportingEnabled === "Yes" ? "Yes" : "No",
   }));

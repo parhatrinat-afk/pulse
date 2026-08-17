@@ -3,6 +3,7 @@ import { computeMappingContentFingerprint } from "../metrics/reporting-group-met
 import { buildWeeklyCorpusManifest } from "./weekly-sales-parser.mjs";
 
 export const WEEKLY_IDENTITY_PREFLIGHT_VERSION = "0.3.0-weekly-identity-preflight-v1";
+export const WEEKLY_IDENTITY_REGISTRY_VERSION = "0.3.0-weekly-identity-registry-v1";
 export const IDENTITY_PENDING = "Identity Pending";
 export const TEST_DEPARTMENT_SOURCE_NAMES = Object.freeze([
   "Test Department (Not for User)",
@@ -78,7 +79,11 @@ export function deriveWeeklyMappingContentFingerprint(catalogs) {
  * evidence. This function does not mutate catalogs, facts, mappings, or source
  * rows and does not build the weekly analytical cache.
  */
-export function buildWeeklyIdentityPreflight({ parsedReports, catalogs }) {
+export function buildWeeklyIdentityPreflight({
+  parsedReports,
+  catalogs,
+  acceptedIdentityRegistry,
+}) {
   const sourceSystemId = requiredText(catalogs?.sourceSystemId, "catalog SourceSystemID");
   const reports = requireReports(parsedReports, sourceSystemId);
   const corpus = buildWeeklyCorpusManifest(reports);
@@ -95,24 +100,29 @@ export function buildWeeklyIdentityPreflight({ parsedReports, catalogs }) {
     );
   }
   catalog.mappingContentFingerprint = mappingContentFingerprint;
+  const identityCatalog = extendCatalogWithAcceptedIdentityRegistry({
+    catalog,
+    acceptedIdentityRegistry,
+    sourceSystemId,
+  });
   const observed = observeSourceRows(rows, sourceSystemId);
 
-  const restaurantPlan = planRestaurants(observed.restaurants, catalog.restaurants, sourceSystemId);
+  const restaurantPlan = planRestaurants(observed.restaurants, identityCatalog.restaurants, sourceSystemId);
   const classificationPlan = planClassifications(
     observed.classifications,
-    catalog.classifications,
+    identityCatalog.classifications,
     sourceSystemId,
   );
   const productPlan = planProducts(
     observed.products,
-    catalog.products,
+    identityCatalog.products,
     classificationPlan.byKey,
     sourceSystemId,
   );
 
-  const allRestaurants = [...catalog.restaurants, ...restaurantPlan.candidates];
-  const allClassifications = [...catalog.classifications, ...classificationPlan.candidates];
-  const allProducts = [...catalog.products, ...productPlan.candidates];
+  const allRestaurants = [...identityCatalog.restaurants, ...restaurantPlan.candidates];
+  const allClassifications = [...identityCatalog.classifications, ...classificationPlan.candidates];
+  const allProducts = [...identityCatalog.products, ...productPlan.candidates];
   const restaurantByKey = uniqueIndex(allRestaurants, row => restaurantKey(row.sourceSystemId, row.sourceRestaurantName));
   const classificationByKey = uniqueIndex(allClassifications, row => row.sourceClassificationKey);
   const productByKey = uniqueIndex(allProducts, row => row.productKey);
@@ -127,9 +137,9 @@ export function buildWeeklyIdentityPreflight({ parsedReports, catalogs }) {
   });
   const hierarchyReview = buildHierarchyReview({
     observedProducts: observed.products,
-    currentProducts: catalog.products,
+    currentProducts: identityCatalog.products,
     currentClassificationKeys: new Set(
-      catalog.classifications.map(row => row.sourceClassificationKey),
+      identityCatalog.classifications.map(row => row.sourceClassificationKey),
     ),
     productByKey,
     classificationByKey,
@@ -211,7 +221,7 @@ export function buildWeeklyIdentityPreflight({ parsedReports, catalogs }) {
     ...enrichCatalogCollisions(catalog.collisions, observed),
     ...buildCurrentProductHierarchyPending({
       observedProducts: observed.products,
-      currentProducts: catalog.products,
+      currentProducts: identityCatalog.products,
       productByKey,
       mappingByProduct,
     }),
@@ -275,7 +285,70 @@ export function buildWeeklyIdentityPreflight({ parsedReports, catalogs }) {
     },
     fingerprints,
     rowAssignments,
+    acceptedIdentityRegistry: identityCatalog.registry,
   };
+}
+
+function extendCatalogWithAcceptedIdentityRegistry({
+  catalog,
+  acceptedIdentityRegistry,
+  sourceSystemId,
+}) {
+  const registry = {
+    restaurants: (acceptedIdentityRegistry?.restaurants ?? []).map(row => ({ ...row })),
+    classifications: (acceptedIdentityRegistry?.classifications ?? []).map(row => ({ ...row })),
+    products: (acceptedIdentityRegistry?.products ?? []).map(row => ({ ...row })),
+  };
+  for (const row of [...registry.restaurants, ...registry.classifications, ...registry.products]) {
+    if (row.sourceSystemId !== sourceSystemId) {
+      throw new Error(`PUL-030I-110: Accepted identity ${row.sourceSystemId} belongs to another source system.`);
+    }
+  }
+  const restaurants = [...catalog.restaurants, ...registry.restaurants];
+  const classifications = [...catalog.classifications, ...registry.classifications];
+  const products = [...catalog.products, ...registry.products];
+  const collisions = [
+    ...acceptedRegistryCollisions({
+      entityType: "Accepted Restaurant",
+      base: catalog.restaurants,
+      accepted: registry.restaurants,
+      keySelector: row => restaurantKey(row.sourceSystemId, row.sourceRestaurantName),
+      idField: "restaurantId",
+    }),
+    ...acceptedRegistryCollisions({
+      entityType: "Accepted Product",
+      base: catalog.products,
+      accepted: registry.products,
+      keySelector: row => row.productKey,
+      idField: "productId",
+    }),
+    ...acceptedRegistryCollisions({
+      entityType: "Accepted Source classification",
+      base: catalog.classifications,
+      accepted: registry.classifications,
+      keySelector: row => row.sourceClassificationKey,
+      idField: "sourceClassificationId",
+    }),
+  ];
+  if (collisions.length) {
+    throw new Error(`PUL-030I-111: Accepted identity registry collides: ${collisions.map(row => row.sourceKey).join(", ")}.`);
+  }
+  return { restaurants, classifications, products, registry };
+}
+
+function acceptedRegistryCollisions({ entityType, base, accepted, keySelector, idField }) {
+  const baseKeys = new Set(base.map(keySelector));
+  const baseIds = new Set(base.map(row => row[idField]));
+  const collisions = [
+    ...duplicateValues(accepted.map(keySelector)),
+    ...duplicateValues(accepted.map(row => row[idField])),
+  ];
+  for (const row of accepted) {
+    const key = keySelector(row);
+    if (baseKeys.has(key)) collisions.push(key);
+    if (baseIds.has(row[idField])) collisions.push(row[idField]);
+  }
+  return [...new Set(collisions)].map(sourceKey => ({ entityType, sourceKey }));
 }
 
 export function summarizeWeeklyIdentityPreflight(result, candidateLimit = 20) {
@@ -310,6 +383,63 @@ export function summarizeWeeklyIdentityPreflight(result, candidateLimit = 20) {
     reconciliation: result.reconciliation,
     fingerprints: result.fingerprints,
   };
+}
+
+export function acceptedIdentityRegistryFromPreflight(preflight) {
+  const source = preflight?.newIdentityCandidates ?? {};
+  return normalizeAcceptedIdentityRegistry(source);
+}
+
+export function normalizeAcceptedIdentityRegistry(source) {
+  return {
+    restaurants: (source?.restaurants ?? []).map(row => ({
+      restaurantId: row.restaurantId,
+      sourceSystemId: row.sourceSystemId,
+      sourceRestaurantName: row.sourceRestaurantName,
+      displayName: row.displayName,
+      status: row.status,
+      reportingEnabled: row.reportingEnabled,
+    })).sort((left, right) => compareText(left.restaurantId, right.restaurantId)),
+    classifications: (source?.classifications ?? []).map(row => ({
+      sourceClassificationId: row.sourceClassificationId,
+      sourceSystemId: row.sourceSystemId,
+      sourceMainCategory: row.sourceMainCategory,
+      sourceSubCategory: row.sourceSubCategory,
+      sourceClassificationKey: row.sourceClassificationKey,
+      status: row.status,
+    })).sort((left, right) => compareText(left.sourceClassificationId,
+      right.sourceClassificationId)),
+    products: (source?.products ?? []).map(row => ({
+      productId: row.productId,
+      sourceSystemId: row.sourceSystemId,
+      sourceProductName: row.sourceProductName,
+      salesAccount: row.salesAccount,
+      sourceClassificationId: row.sourceClassificationId,
+      productKey: row.productKey,
+      productStatus: row.productStatus,
+      hierarchyStatus: row.hierarchyStatus,
+      observedHierarchyPaths: [...(row.observedHierarchyPaths ?? [])].sort(compareText),
+    })).sort((left, right) => compareText(left.productId, right.productId)),
+  };
+}
+
+export function fingerprintAcceptedIdentityRegistry(source) {
+  const registry = normalizeAcceptedIdentityRegistry(source);
+  const records = [record("CONTRACT", [WEEKLY_IDENTITY_REGISTRY_VERSION])];
+  for (const row of registry.restaurants) records.push(record("RESTAURANT", [
+    row.restaurantId, row.sourceSystemId, row.sourceRestaurantName, row.displayName,
+    row.status, row.reportingEnabled,
+  ]));
+  for (const row of registry.classifications) records.push(record("CLASSIFICATION", [
+    row.sourceClassificationId, row.sourceSystemId, row.sourceMainCategory,
+    row.sourceSubCategory, row.sourceClassificationKey, row.status,
+  ]));
+  for (const row of registry.products) records.push(record("PRODUCT", [
+    row.productId, row.sourceSystemId, row.sourceProductName, row.salesAccount,
+    row.sourceClassificationId, row.productKey, row.productStatus, row.hierarchyStatus,
+    ...row.observedHierarchyPaths,
+  ]));
+  return hashStrings(records.sort(compareText), "WIR-");
 }
 
 function validateCatalogs(catalogs, sourceSystemId) {

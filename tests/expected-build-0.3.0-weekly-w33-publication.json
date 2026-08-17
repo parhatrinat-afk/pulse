@@ -1,0 +1,78 @@
+{
+  "period": {
+    "sourcePeriodKey": "PERIOD-2026-08-10-2026-08-16",
+    "periodStart": "2026-08-10",
+    "periodEnd": "2026-08-16",
+    "isoYear": 2026,
+    "isoWeek": 33,
+    "sourceRowCount": 2940,
+    "salesNok": 5636773.5,
+    "quantity": 29654.35,
+    "semanticFingerprint": "WSF-641061337dfbfd59"
+  },
+  "prior": {
+    "cacheVersion": "WCV-1a34ad1f46763d9b",
+    "cacheFingerprint": "WCC-508dd608166cdb6e",
+    "identityPreflightFingerprint": "IDP-062c182f23905ae8",
+    "identityRegistryFingerprint": "WIR-776953cb0144af11",
+    "identityRegistryCounts": {
+      "restaurants": 2,
+      "classifications": 19,
+      "products": 193
+    }
+  },
+  "candidate": {
+    "cacheVersion": "WCV-1b0b195c210da456",
+    "cacheFingerprint": "WCC-26c195956ebc2823",
+    "sourceCorpusFingerprint": "WSC-73aa25c910e745ed",
+    "identityPreflightFingerprint": "IDP-4ae1a62974cca3af",
+    "identityRegistryFingerprint": "WIR-00fc39ff746cb4d1",
+    "periodRows": 85,
+    "scopeRows": 1438,
+    "rpgRows": 12942,
+    "completeRows": 14466,
+    "source": {
+      "factCount": 248572,
+      "salesNok": 490365140.75,
+      "quantity": 2499642.44
+    },
+    "mappingStateCoverage": {
+      "Mapped": { "factCount": 229190, "salesNok": 479649885.1, "quantity": 2367590.46 },
+      "Unmapped": { "factCount": 19256, "salesNok": 10595207.65, "quantity": 131052.98 },
+      "Identity Pending": { "factCount": 126, "salesNok": 120048, "quantity": 999 },
+      "Conflict": { "factCount": 0, "salesNok": 0, "quantity": 0 },
+      "Inactive Target": { "factCount": 0, "salesNok": 0, "quantity": 0 }
+    },
+    "identityRegistryCounts": {
+      "restaurants": 2,
+      "classifications": 19,
+      "products": 196
+    }
+  },
+  "w33": {
+    "mappingStateCoverage": {
+      "Mapped": { "factCount": 2705, "salesNok": 5489343.5, "quantity": 27483.85 },
+      "Unmapped": { "factCount": 229, "salesNok": 142258, "quantity": 2122.5 },
+      "Identity Pending": { "factCount": 6, "salesNok": 5172, "quantity": 48 },
+      "Conflict": { "factCount": 0, "salesNok": 0, "quantity": 0 },
+      "Inactive Target": { "factCount": 0, "salesNok": 0, "quantity": 0 }
+    },
+    "performanceEligibleDenominator": {
+      "factCount": 2938,
+      "salesNok": 5636734.5,
+      "quantity": 29653.35
+    },
+    "newProducts": [
+      { "productId": "PRD-001235", "name": "Staff Red Bull Sugar Free", "factCount": 2, "salesNok": 60, "quantity": 2 },
+      { "productId": "PRD-001236", "name": "Staff Red Bull", "factCount": 4, "salesNok": 270, "quantity": 9 },
+      { "productId": "PRD-001237", "name": "Staff Still Water", "factCount": 1, "salesNok": 22, "quantity": 1 }
+    ],
+    "newRestaurants": 0,
+    "newClassifications": 0
+  },
+  "independentFullRebuild": {
+    "status": "PASS",
+    "businessRowsEqual": true,
+    "sourceTotalsEqual": true
+  }
+}
