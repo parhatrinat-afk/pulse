@@ -95,6 +95,13 @@ accepted Add-ons fixtures, active-cache freshness, additive aggregation before
 shares, the four bounded component-block replacements, Reports linkage and
 preservation of the Phase 2C numeric/presentation architecture.
 
+The weekly intake publisher/adapter suites validate dynamic Active authority,
+all five intake outcomes, deterministic inactive Candidate construction,
+idempotent hidden-ledger behavior, bounded Candidate payloads, typed
+Power-Automate routing results, Active-cache isolation, and Office Scripts
+compiler/performance compatibility. They do not implement a flow or activate a
+new cache.
+
 For Build 0.3.0, tests should cover at minimum:
 
 - Reporting Group registry integrity.

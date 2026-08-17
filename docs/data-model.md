@@ -129,6 +129,28 @@ invalidate unchanged mapping content. Candidate validation and activation are
 separate states. Only one validated `Active` / `Active` version may supply the
 weekly Performance path.
 
+Weekly consumers resolve that authority dynamically from the version manifest;
+they do not pin a particular WCV/WCC. Zero or multiple `Active` / `Active` rows
+make the weekly surface unavailable. The resolved version must match current
+mapping content, catalog/identity evidence, ReportingEnabled restaurant scope,
+validation and materialized row-count contracts.
+
+A hidden `tblWeeklyIntakeLog` on `_Weekly_Cache` is the operational
+idempotency/status ledger, not another fact store. It records source locator and semantic lineage,
+classification outcome, source counts/Sales NOK, processing time and related
+cache versions. A valid new week produces a complete inactive Candidate version
+from the validated active history plus the newly resolved week; it never appends
+in place to the Active version. Full analytical retention is bounded to Active
+plus one previous rollback version, while source/period/version/intake manifests
+remain historical evidence.
+
+The weekly intake runtime accepts only parser metadata for outcome
+classification. It does not resolve identities, map facts, or calculate cache
+rows. A New period is materialized only from the complete validated Candidate
+produced by the repository publisher. That Candidate is staged on hidden
+`_Weekly_Cache_Candidate` and remains `Candidate / Not Active`; activation is a
+separate authority transition.
+
 ### Weekly Performance Period Selection
 
 Current and Compare each store ISO Year, From week, and To week as user-facing

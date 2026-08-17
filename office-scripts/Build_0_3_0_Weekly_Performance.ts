@@ -21,11 +21,13 @@ function main(workbook: ExcelScript.Workbook): string {
   const periodRows = tableRows(periodTable);
   const scopeRows = tableRows(scopeTable);
   const rpgRows = tableRows(rpgTable);
-  validateActiveCache(versionTable, versionRows, periodTable, periodRows, scopeRows, rpgRows);
+  const authority = validateActiveCache(
+    versionTable, versionRows, periodTable, periodRows, scopeRows, rpgRows
+  );
   const live = validateLiveState(workbook);
-  if (live.mappingContentFingerprint !== EXPECTED_MAPPING_CONTENT ||
-      live.catalogContentFingerprint !== EXPECTED_CATALOG_CONTENT ||
-      live.performanceRestaurantScopeFingerprint !== EXPECTED_RESTAURANT_SCOPE ||
+  if (live.mappingContentFingerprint !== authority.mappingContentFingerprint ||
+      live.catalogContentFingerprint !== authority.catalogContentFingerprint ||
+      live.performanceRestaurantScopeFingerprint !== authority.performanceRestaurantScopeFingerprint ||
       live.phase2CPassCount !== 16) {
     throw new Error(`PUL-030P-001: Weekly Performance freshness preflight failed. ${JSON.stringify(live)}`);
   }
@@ -37,9 +39,9 @@ function main(workbook: ExcelScript.Workbook): string {
   const alreadyWeekly = text(performance.getRange("A10").getValue()) === "Year" &&
     text(performance.getRange("F10").getValue()) === "Year";
 
-  writeValidationLists(performance, periodRows);
-  writePeriodControls(performance, alreadyWeekly, currentValues, comparisonValues);
-  writeWeeklyControl(calc);
+  const yearSource = writeValidationLists(performance, periodRows, authority.cacheVersion);
+  writePeriodControls(performance, alreadyWeekly, currentValues, comparisonValues, yearSource);
+  writeWeeklyControl(calc, authority, live);
   writePeriodKeyHelpers(calc);
   writeWeeklyComponentFormulas(calc);
   writeReportsPeriodLinks(reports);
@@ -47,15 +49,15 @@ function main(workbook: ExcelScript.Workbook): string {
   workbook.getApplication().calculate(ExcelScript.CalculationType.full);
 
   validateInstalledState(performance, reports, calc);
-  writeWeeklyPerformanceQA(workbook, qaSheet, live);
+  writeWeeklyPerformanceQA(workbook, qaSheet, live, authority);
   const protectedAfter = protectedFingerprint(workbook);
   if (protectedBefore !== protectedAfter) {
     throw new Error("PUL-030P-002: A protected source, mapping, legacy result, import, or selection table changed.");
   }
   return JSON.stringify({
     status: "PASS",
-    cacheVersion: EXPECTED_CACHE_VERSION,
-    cacheFingerprint: EXPECTED_CACHE_FINGERPRINT,
+    cacheVersion: authority.cacheVersion,
+    cacheFingerprint: authority.cacheFingerprint,
     current: performance.getRange("B13").getText(),
     comparison: performance.getRange("G13").getText(),
     cacheFreshness: calc.getRange("AL16").getText(),
@@ -75,12 +77,15 @@ type LiveState = {
   phase2CPassCount: number;
 };
 
-const EXPECTED_CACHE_VERSION = "WCV-1a34ad1f46763d9b";
-const EXPECTED_CACHE_FINGERPRINT = "WCC-508dd608166cdb6e";
-const EXPECTED_MAPPING_CONTENT = "MCF-759cc92c4304a913";
-const EXPECTED_CATALOG_CONTENT = "ICC-5644a77c18a97437";
-const EXPECTED_IDENTITY_PREFLIGHT = "IDP-062c182f23905ae8";
-const EXPECTED_RESTAURANT_SCOPE = "RSC-08df626f217dd94b";
+type ActiveCacheAuthority = {
+  cacheVersion: string;
+  cacheFingerprint: string;
+  mappingContentFingerprint: string;
+  catalogContentFingerprint: string;
+  identityPreflightFingerprint: string;
+  performanceRestaurantScopeFingerprint: string;
+};
+
 const RESTAURANT_CAPACITY = 16;
 const GROUP_CAPACITY = 9;
 const CURRENT_PERIOD_KEYS = "$DN$2:$DN$54";
@@ -93,33 +98,55 @@ function validateActiveCache(
   periodRows: CellValue[][],
   scopeRows: CellValue[][],
   rpgRows: CellValue[][]
-): void {
-  if (versionRows.length !== 1 || periodRows.length !== 84 || scopeRows.length !== 1421 || rpgRows.length !== 12789) {
-    throw new Error(`PUL-030P-003: Weekly cache row counts differ: ${versionRows.length}/${periodRows.length}/${scopeRows.length}/${rpgRows.length}.`);
-  }
+): ActiveCacheAuthority {
   const vh = headerMap(versionTable);
-  const row = versionRows[0];
-  const required = [
-    ["CacheVersion", EXPECTED_CACHE_VERSION], ["CacheStatus", "Active"],
-    ["ActivationState", "Active"], ["ValidationStatus", "PASS"],
-    ["CacheFingerprint", EXPECTED_CACHE_FINGERPRINT],
-    ["MappingContentFingerprint", EXPECTED_MAPPING_CONTENT],
-    ["CatalogContentFingerprint", EXPECTED_CATALOG_CONTENT],
-    ["IdentityPreflightFingerprint", EXPECTED_IDENTITY_PREFLIGHT],
-    ["PerformanceRestaurantScopeFingerprint", EXPECTED_RESTAURANT_SCOPE]
+  const activeRows: CellValue[][] = [];
+  for (const row of versionRows) {
+    if (text(row[vh.CacheStatus]) === "Active" &&
+        text(row[vh.ActivationState]) === "Active") activeRows.push(row);
+  }
+  if (activeRows.length !== 1) {
+    throw new Error(`PUL-030P-003: Weekly cache requires exactly one Active / Active authority; found ${activeRows.length}.`);
+  }
+  const row = activeRows[0];
+  if (text(row[vh.ValidationStatus]) !== "PASS") {
+    throw new Error(`PUL-030P-004: Active cache validation is ${text(row[vh.ValidationStatus])}; expected PASS.`);
+  }
+  const authority: ActiveCacheAuthority = {
+    cacheVersion: text(row[vh.CacheVersion]),
+    cacheFingerprint: text(row[vh.CacheFingerprint]),
+    mappingContentFingerprint: text(row[vh.MappingContentFingerprint]),
+    catalogContentFingerprint: text(row[vh.CatalogContentFingerprint]),
+    identityPreflightFingerprint: text(row[vh.IdentityPreflightFingerprint]),
+    performanceRestaurantScopeFingerprint: text(row[vh.PerformanceRestaurantScopeFingerprint])
+  };
+  const authorityFields: string[][] = [
+    ["CacheVersion", authority.cacheVersion],
+    ["CacheFingerprint", authority.cacheFingerprint],
+    ["MappingContentFingerprint", authority.mappingContentFingerprint],
+    ["CatalogContentFingerprint", authority.catalogContentFingerprint],
+    ["IdentityPreflightFingerprint", authority.identityPreflightFingerprint],
+    ["PerformanceRestaurantScopeFingerprint", authority.performanceRestaurantScopeFingerprint]
   ];
-  for (const item of required) {
-    if (text(row[vh[item[0]]]) !== item[1]) {
-      throw new Error(`PUL-030P-004: ${item[0]} is ${text(row[vh[item[0]]])}; expected ${item[1]}.`);
-    }
+  for (const item of authorityFields) {
+    if (!item[1]) throw new Error(`PUL-030P-004: Active cache ${item[0]} is blank.`);
   }
   const ph = headerMap(periodTable);
+  const activePeriods = periodRows.filter(value => text(value[ph.CacheVersion]) === authority.cacheVersion);
+  const activeScopes = scopeRows.filter(value => text(value[1]) === authority.cacheVersion);
+  const activeRpgs = rpgRows.filter(value => text(value[1]) === authority.cacheVersion);
+  if (activePeriods.length !== number(row[vh.PeriodRowCount]) ||
+      activeScopes.length !== number(row[vh.ScopeCacheRowCount]) ||
+      activeRpgs.length !== number(row[vh.DenseRPGCacheRowCount])) {
+    throw new Error(`PUL-030P-003: Active cache row counts differ from its manifest: ${activePeriods.length}/${activeScopes.length}/${activeRpgs.length}.`);
+  }
   const seen: { [key: string]: boolean } = {};
-  for (const period of periodRows) {
+  for (const period of activePeriods) {
     const key = `${number(period[ph.ISOYear])}|${number(period[ph.ISOWeek])}`;
     if (seen[key]) throw new Error(`PUL-030P-005: Duplicate manifest ISO period ${key}.`);
     seen[key] = true;
   }
+  return authority;
 }
 
 function validatePhase2CLayout(
@@ -138,10 +165,15 @@ function validatePhase2CLayout(
   }
 }
 
-function writeValidationLists(performance: ExcelScript.Worksheet, periodRows: CellValue[][]): void {
+function writeValidationLists(
+  performance: ExcelScript.Worksheet,
+  periodRows: CellValue[][],
+  activeCacheVersion: string
+): ExcelScript.Range {
   const years: number[] = [];
   const seenYears: { [key: string]: boolean } = {};
   for (const row of periodRows) {
+    if (text(row[1]) !== activeCacheVersion) continue;
     const year = number(row[5]);
     if (!seenYears[String(year)]) { seenYears[String(year)] = true; years.push(year); }
   }
@@ -155,13 +187,15 @@ function writeValidationLists(performance: ExcelScript.Worksheet, periodRows: Ce
   performance.getRangeByIndexes(1, 21, yearValues.length, 1).setValues(yearValues);
   performance.getRange("W2:W54").setValues(weekValues);
   performance.getRange("V:W").setColumnHidden(true);
+  return performance.getRangeByIndexes(1, 21, yearValues.length, 1);
 }
 
 function writePeriodControls(
   performance: ExcelScript.Worksheet,
   alreadyWeekly: boolean,
   priorCurrent: CellValue[][],
-  priorComparison: CellValue[][]
+  priorComparison: CellValue[][],
+  yearSource: ExcelScript.Range
 ): void {
   performance.getRange("A9:D13").clear(ExcelScript.ClearApplyTo.contents);
   performance.getRange("F9:I13").clear(ExcelScript.ClearApplyTo.contents);
@@ -189,8 +223,8 @@ function writePeriodControls(
   performance.getRange("G10:G12").getFormat().getFont().setBold(true);
   performance.getRange("B13:D13").getFormat().getFill().setColor("#EAF2FF");
   performance.getRange("G13:I13").getFormat().getFill().setColor("#EAF2FF");
-  applyRangeValidation(performance.getRange("B10"), performance.getRange("V2:V3"));
-  applyRangeValidation(performance.getRange("G10"), performance.getRange("V2:V3"));
+  applyRangeValidation(performance.getRange("B10"), yearSource);
+  applyRangeValidation(performance.getRange("G10"), yearSource);
   const weekSource = performance.getRange("W2:W54");
   applyRangeValidation(performance.getRange("B11"), weekSource);
   applyRangeValidation(performance.getRange("B12"), weekSource);
@@ -206,14 +240,18 @@ function writePeriodControls(
   performance.getRange("G18").setFormula("=_Metric_Calc!$AL$23");
 }
 
-function writeWeeklyControl(calc: ExcelScript.Worksheet): void {
-  calc.getRange("AK1:AL26").clear(ExcelScript.ClearApplyTo.contents);
-  calc.getRange("AK1:AL26").setValues([
+function writeWeeklyControl(
+  calc: ExcelScript.Worksheet,
+  authority: ActiveCacheAuthority,
+  live: LiveState
+): void {
+  calc.getRange("AK1:AL30").clear(ExcelScript.ClearApplyTo.contents);
+  calc.getRange("AK1:AL30").setValues([
     ["Weekly Performance control", "Value"],
     ["Current period", ""], ["Comparison period", ""],
     ["Selected restaurant count", ""], ["Selected RPG count", ""],
     ["Detail ReportingGroupID", ""], ["Matrix display", ""],
-    ["Company scope fingerprint", EXPECTED_RESTAURANT_SCOPE],
+    ["Company scope fingerprint", authority.performanceRestaurantScopeFingerprint],
     ["Interaction contract", "Weekly cache additive components only"],
     ["Restaurant capacity", RESTAURANT_CAPACITY], ["RPG capacity", GROUP_CAPACITY],
     ["Requested sort ReportingGroupID", ""], ["Effective sort ReportingGroupID", ""],
@@ -223,7 +261,11 @@ function writeWeeklyControl(calc: ExcelScript.Worksheet): void {
     ["Comparison available weeks", ""], ["Current summary", ""],
     ["Comparison summary", ""], ["Period status", ""],
     ["Active CacheVersion", ""], ["Current expected weeks", ""],
-    ["Comparison expected weeks", ""]
+    ["Comparison expected weeks", ""],
+    ["Current MappingContentFingerprint", live.mappingContentFingerprint],
+    ["Current CatalogContentFingerprint", live.catalogContentFingerprint],
+    ["Current ReportingEnabled fingerprint", live.performanceRestaurantScopeFingerprint],
+    ["Accepted IdentityPreflightFingerprint", authority.identityPreflightFingerprint]
   ]);
   calc.getRange("AL2").setFormula("=Performance!$B$13");
   calc.getRange("AL3").setFormula("=Performance!$G$13");
@@ -243,7 +285,7 @@ function writeWeeklyControl(calc: ExcelScript.Worksheet): void {
   calc.getRange("AL21").setFormula(periodSummaryFormula("$B$10", "$B$11", "$B$12", "$AL$17", "$AL$19", "$AL$25"));
   calc.getRange("AL22").setFormula(periodSummaryFormula("$G$10", "$G$11", "$G$12", "$AL$18", "$AL$20", "$AL$26"));
   calc.getRange("AL23").setFormula(periodWarningFormula());
-  calc.getRange("AL24").setFormula(`=IF($AL$16="Available","${EXPECTED_CACHE_VERSION}","")`);
+  calc.getRange("AL24").setFormula(activeCacheVersionFormula());
   calc.getRange("AL25").setFormula('=IFERROR(VALUE(RIGHT(Performance!$B$12,2))-VALUE(RIGHT(Performance!$B$11,2))+1,0)');
   calc.getRange("AL26").setFormula('=IFERROR(VALUE(RIGHT(Performance!$G$12,2))-VALUE(RIGHT(Performance!$G$11,2))+1,0)');
 }
@@ -332,15 +374,16 @@ function validateInstalledState(
 function writeWeeklyPerformanceQA(
   workbook: ExcelScript.Workbook,
   sheet: ExcelScript.Worksheet,
-  live: LiveState
+  live: LiveState,
+  authority: ActiveCacheAuthority
 ): void {
   const prior = workbook.getTable("tblWeeklyPerformanceQA");
   if (prior) prior.delete();
   sheet.getRange("A43:E62").clear(ExcelScript.ClearApplyTo.all);
   const rows: (string | number | boolean)[][] = [
-    ["QA-030WP-01", "Single active validated cache", "PASS", EXPECTED_CACHE_VERSION, EXPECTED_CACHE_FINGERPRINT],
+    ["QA-030WP-01", "Single active validated cache", "PASS", authority.cacheVersion, authority.cacheFingerprint],
     ["QA-030WP-02", "Date-neutral mapping freshness", "PASS", live.mappingContentFingerprint, "MappingAsOfDate is not a weekly freshness input."],
-    ["QA-030WP-03", "Catalog and identity freshness", "PASS", live.catalogContentFingerprint, EXPECTED_IDENTITY_PREFLIGHT],
+    ["QA-030WP-03", "Catalog and identity freshness", "PASS", live.catalogContentFingerprint, authority.identityPreflightFingerprint],
     ["QA-030WP-04", "ReportingEnabled scope freshness", "PASS", live.performanceRestaurantScopeFingerprint, "Active/ReportingEnabled restaurants match cache eligibility."],
     ["QA-030WP-05", "Complete independent period validation", "PASS", "2026 W01–W32 | 2025 W01–W32", "Each side blocks incomplete/invalid selections."],
     ["QA-030WP-06", "Weekly cache is authoritative", "PASS", "tblWeeklyRPGCache + tblWeeklyScopeCache", "Legacy tblMetricRPGResults remains rollback-only."],
@@ -364,7 +407,11 @@ function writeWeeklyPerformanceQA(
 }
 
 function cacheFreshnessFormula(): string {
-  return `=LET(v,"${EXPECTED_CACHE_VERSION}",manifest,COUNTIFS(tblWeeklyCacheVersions[CacheVersion],v,tblWeeklyCacheVersions[CacheStatus],"Active",tblWeeklyCacheVersions[ActivationState],"Active",tblWeeklyCacheVersions[ValidationStatus],"PASS",tblWeeklyCacheVersions[CacheFingerprint],"${EXPECTED_CACHE_FINGERPRINT}",tblWeeklyCacheVersions[MappingContentFingerprint],"${EXPECTED_MAPPING_CONTENT}",tblWeeklyCacheVersions[CatalogContentFingerprint],"${EXPECTED_CATALOG_CONTENT}",tblWeeklyCacheVersions[IdentityPreflightFingerprint],"${EXPECTED_IDENTITY_PREFLIGHT}",tblWeeklyCacheVersions[PerformanceRestaurantScopeFingerprint],"${EXPECTED_RESTAURANT_SCOPE}")=1,live,FILTER(tblRestaurants[RestaurantID],(tblRestaurants[Status]="Active")*(tblRestaurants[ReportingEnabled]="Yes"),""),cached,UNIQUE(FILTER(tblWeeklyScopeCache[RestaurantID],(tblWeeklyScopeCache[CacheVersion]=v)*(tblWeeklyScopeCache[PerformanceEligible]="Yes"),"")),scope,AND(ROWS(live)=ROWS(cached),SUM(--ISNUMBER(XMATCH(live,cached)))=ROWS(live)),IF(AND(manifest,scope),"Available","Stale / unavailable"))`;
+  return '=LET(n,COUNTIFS(tblWeeklyCacheVersions[CacheStatus],"Active",tblWeeklyCacheVersions[ActivationState],"Active"),v,IF(n=1,XLOOKUP(1,(tblWeeklyCacheVersions[CacheStatus]="Active")*(tblWeeklyCacheVersions[ActivationState]="Active"),tblWeeklyCacheVersions[CacheVersion],""),""),validation,IF(n=1,XLOOKUP(v,tblWeeklyCacheVersions[CacheVersion],tblWeeklyCacheVersions[ValidationStatus],""),""),manifest,AND(n=1,validation="PASS",XLOOKUP(v,tblWeeklyCacheVersions[CacheVersion],tblWeeklyCacheVersions[CacheFingerprint],"")<>"",XLOOKUP(v,tblWeeklyCacheVersions[CacheVersion],tblWeeklyCacheVersions[MappingContentFingerprint],"")=$AL$27,XLOOKUP(v,tblWeeklyCacheVersions[CacheVersion],tblWeeklyCacheVersions[CatalogContentFingerprint],"")=$AL$28,XLOOKUP(v,tblWeeklyCacheVersions[CacheVersion],tblWeeklyCacheVersions[IdentityPreflightFingerprint],"")=$AL$30,XLOOKUP(v,tblWeeklyCacheVersions[CacheVersion],tblWeeklyCacheVersions[PerformanceRestaurantScopeFingerprint],"")=$AL$29,COUNTIF(tblWeeklyPeriodManifest[CacheVersion],v)=XLOOKUP(v,tblWeeklyCacheVersions[CacheVersion],tblWeeklyCacheVersions[PeriodRowCount],-1),COUNTIF(tblWeeklyScopeCache[CacheVersion],v)=XLOOKUP(v,tblWeeklyCacheVersions[CacheVersion],tblWeeklyCacheVersions[ScopeCacheRowCount],-1),COUNTIF(tblWeeklyRPGCache[CacheVersion],v)=XLOOKUP(v,tblWeeklyCacheVersions[CacheVersion],tblWeeklyCacheVersions[DenseRPGCacheRowCount],-1)),live,FILTER(tblRestaurants[RestaurantID],(tblRestaurants[Status]="Active")*(tblRestaurants[ReportingEnabled]="Yes"),""),cached,UNIQUE(FILTER(tblWeeklyScopeCache[RestaurantID],(tblWeeklyScopeCache[CacheVersion]=v)*(tblWeeklyScopeCache[PerformanceEligible]="Yes"),"")),scope,IF(n=1,AND(ROWS(live)=ROWS(cached),SUM(--ISNUMBER(XMATCH(live,cached)))=ROWS(live)),FALSE),IF(n=0,"Unavailable — no active cache",IF(n>1,"Unavailable — multiple active caches",IF(AND(manifest,scope),"Available","Stale / unavailable"))))';
+}
+
+function activeCacheVersionFormula(): string {
+  return '=LET(n,COUNTIFS(tblWeeklyCacheVersions[CacheStatus],"Active",tblWeeklyCacheVersions[ActivationState],"Active"),IF(n=1,XLOOKUP(1,(tblWeeklyCacheVersions[CacheStatus]="Active")*(tblWeeklyCacheVersions[ActivationState]="Active"),tblWeeklyCacheVersions[CacheVersion],""),""))';
 }
 
 function periodStateFormula(year: string, fromWeek: string, toWeek: string): string {

@@ -27,13 +27,22 @@ Build 0.3.0 begins the bounded weekly source parser foundation here.
   the minimum freshness guard future weekly consumers must pass. It treats
   mapping content, catalog/identity content, ReportingEnabled scope and cache
   QA as authority; date-only mapping audit changes are intentionally ignored.
+- `weekly-intake-publisher.mjs` classifies one accepted parser result against
+  the single fresh Active cache and deterministically prepares a complete
+  inactive Candidate for a new period. Duplicate, correction, rejected and
+  stale outcomes are no-ops; the module performs no workbook or OneDrive write.
+- `weekly-intake-office-adapter.mjs` converts accepted parser/publisher outputs
+  into small runtime payloads for `Process_Weekly_Intake.ts`. The Office Script
+  rechecks live Active authority, records idempotent no-op outcomes in hidden
+  `tblWeeklyIntakeLog`, and can write an already-approved complete New Candidate
+  in bounded chunks without activating it.
 
 None of these foundations publishes weekly facts or supersedes legacy imports.
-Activation changes only the accepted cache-version authority; Performance does
-not consume the weekly cache until a separately approved cutover. The identity
-preflight may evaluate proposed ProductIDs through the existing mapping
-resolver, but it never creates mapping rules or treats identity creation as a
-business mapping decision.
+Weekly Performance consumes the single fresh Active cache through the dynamic
+version-manifest authority; the intake publisher returns only an inactive
+Candidate. The identity preflight may evaluate proposed ProductIDs through the
+existing mapping resolver, but it never creates mapping rules or treats identity
+creation as a business mapping decision.
 
 The weekly export has no encoded Channel/filter field. Scope is a human-owned
 manifest contract (`SCOPE-030-WEEKLY-SALES-PER-ITEM`), not an inference from

@@ -129,6 +129,21 @@ test("Office Script installs the exact weekly controls and accepted defaults", (
   assert.match(script, /Same Current and Compare period/);
 });
 
+test("Office Script resolves one dynamic Active authority without frozen WCV/WCC dependencies", () => {
+  assert.doesNotMatch(script, /EXPECTED_CACHE_VERSION|EXPECTED_CACHE_FINGERPRINT/);
+  assert.doesNotMatch(script, /WCV-1a34ad1f46763d9b|WCC-508dd608166cdb6e/);
+  assert.match(script, /COUNTIFS\(tblWeeklyCacheVersions\[CacheStatus\],"Active",tblWeeklyCacheVersions\[ActivationState\],"Active"\)/);
+  assert.match(script, /Unavailable — no active cache/);
+  assert.match(script, /Unavailable — multiple active caches/);
+  assert.match(script, /XLOOKUP\(v,tblWeeklyCacheVersions\[CacheVersion\],tblWeeklyCacheVersions\[MappingContentFingerprint\]/);
+  assert.match(script, /XLOOKUP\(v,tblWeeklyCacheVersions\[CacheVersion\],tblWeeklyCacheVersions\[CatalogContentFingerprint\]/);
+  assert.match(script, /XLOOKUP\(v,tblWeeklyCacheVersions\[CacheVersion\],tblWeeklyCacheVersions\[IdentityPreflightFingerprint\]/);
+  assert.match(script, /PerformanceRestaurantScopeFingerprint/);
+  assert.match(script, /PeriodRowCount/);
+  assert.match(script, /ScopeCacheRowCount/);
+  assert.match(script, /DenseRPGCacheRowCount/);
+});
+
 test("weekly cache replaces only Phase 2C additive component inputs", () => {
   assert.match(script, /writeWeeklyComponentBlock\(calc, "AN", true, true\)/);
   assert.match(script, /writeWeeklyComponentBlock\(calc, "AX", true, false\)/);

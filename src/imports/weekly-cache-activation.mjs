@@ -25,12 +25,12 @@ export function planWeeklyCacheActivation({
   if (targetRows.length !== 1) {
     fail("PUL-030A-001", `Expected exactly one ${expected.cacheVersion} version row; found ${targetRows.length}.`);
   }
-  const activeRows = versions.filter(isAuthorityActive);
-  if (activeRows.some(row => row.cacheVersion !== expected.cacheVersion)) {
-    fail("PUL-030A-002", `Another weekly cache version is already Active: ${activeRows.map(row => row.cacheVersion).join(", ")}.`);
+  const authorityRows = versions.filter(hasAnyAuthorityMarker);
+  if (authorityRows.some(row => row.cacheVersion !== expected.cacheVersion)) {
+    fail("PUL-030A-002", `Another weekly cache version has Active authority state: ${authorityRows.map(row => row.cacheVersion).join(", ")}.`);
   }
-  if (activeRows.length > 1) {
-    fail("PUL-030A-003", `Weekly cache authority has ${activeRows.length} Active rows.`);
+  if (authorityRows.length > 1) {
+    fail("PUL-030A-003", `Weekly cache authority has ${authorityRows.length} Active-marked rows.`);
   }
 
   const target = targetRows[0];
@@ -183,6 +183,11 @@ function compareFingerprint(errors, version, current, field, label) {
 }
 
 function isAuthorityActive(row) {
+  return row.cacheStatus === WEEKLY_CACHE_ACTIVE_STATUS &&
+    row.activationState === WEEKLY_CACHE_ACTIVE_STATUS;
+}
+
+function hasAnyAuthorityMarker(row) {
   return row.cacheStatus === WEEKLY_CACHE_ACTIVE_STATUS ||
     row.activationState === WEEKLY_CACHE_ACTIVE_STATUS;
 }

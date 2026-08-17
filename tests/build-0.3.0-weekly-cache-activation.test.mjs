@@ -126,6 +126,12 @@ test("missing, multiple or failed Active authority is unavailable/stale", () => 
     })],
     current: current(),
   }).status, "Stale");
+  const split = validateActiveWeeklyCacheFreshness({
+    versionManifests: [candidate({ cacheStatus: "Active", activationState: "Not Active" })],
+    current: current(),
+  });
+  assert.equal(split.status, "Unavailable");
+  assert.match(split.errors[0], /found 0/);
 });
 
 test("Office Script activates only the exact accepted candidate and ignores mapping date", () => {
