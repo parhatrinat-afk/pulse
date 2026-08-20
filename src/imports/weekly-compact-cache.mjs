@@ -252,6 +252,7 @@ export function buildCandidateWeeklyCache({
     excludedReportingScopeRestaurantIds,
     validation,
     identityPreflight: preflight,
+    mappingAttentionProjection: preflight.mappingAttentionProjection,
   };
 }
 

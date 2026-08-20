@@ -1,4 +1,5 @@
 import { resolveProduct } from "../mapping/hierarchical-resolver.mjs";
+import { buildWeeklyMappingAttentionProjection } from "../mapping/weekly-mapping-attention.mjs";
 import { computeMappingContentFingerprint } from "../metrics/reporting-group-metrics.mjs";
 import { buildWeeklyCorpusManifest } from "./weekly-sales-parser.mjs";
 
@@ -245,7 +246,16 @@ export function buildWeeklyIdentityPreflight({
     coverage,
     sourceTotals,
   });
-
+  const mappingAttentionProjection = buildWeeklyMappingAttentionProjection({
+    products: allProducts,
+    classifications: allClassifications,
+    reportingGroups: catalog.reportingGroups,
+    mappingByProduct,
+    sourceRows: rows,
+    rowAssignments,
+    existingCatalogProductIds: catalog.products.map(row => row.productId),
+    hierarchyReview,
+  });
   return {
     contractVersion: WEEKLY_IDENTITY_PREFLIGHT_VERSION,
     status: reconciliationErrors.length ? "FAIL" : identityPendingItems.length || hierarchyReview.length
@@ -285,6 +295,7 @@ export function buildWeeklyIdentityPreflight({
     },
     fingerprints,
     rowAssignments,
+    mappingAttentionProjection,
     acceptedIdentityRegistry: identityCatalog.registry,
   };
 }
@@ -382,6 +393,25 @@ export function summarizeWeeklyIdentityPreflight(result, candidateLimit = 20) {
     mappingStateCoverage: result.mappingStateCoverage,
     reconciliation: result.reconciliation,
     fingerprints: result.fingerprints,
+    mappingAttentionProjection: summarizeMappingAttention(result.mappingAttentionProjection),
+  };
+}
+
+function summarizeMappingAttention(value) {
+  return {
+    contractVersion: value.contractVersion,
+    validationStatus: value.validationStatus,
+    healthStatus: value.healthStatus,
+    projectionFingerprint: value.projectionFingerprint,
+    totalProductCount: value.totalProductCount,
+    existingProductCount: value.existingProductCount,
+    weeklyAddedProductCount: value.weeklyAddedProductCount,
+    sourceTotals: value.sourceTotals,
+    projectionTotals: value.projectionTotals,
+    stateCoverage: value.stateCoverage,
+    resolutionTypeCounts: value.resolutionTypeCounts,
+    duplicateProductIds: value.duplicateProductIds,
+    duplicateProductKeys: value.duplicateProductKeys,
   };
 }
 

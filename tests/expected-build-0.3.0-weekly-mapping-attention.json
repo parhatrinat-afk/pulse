@@ -1,0 +1,49 @@
+{
+  "contractVersion": "0.3.0-weekly-mapping-attention-v1",
+  "validationStatus": "PASS",
+  "healthStatus": "Attention required",
+  "projectionFingerprint": "WMA-637d7a94536ac4ed",
+  "activeCacheVersion": "WCV-1b0b195c210da456",
+  "activeCacheFingerprint": "WCC-26c195956ebc2823",
+  "sourceCorpusFingerprint": "WSC-73aa25c910e745ed",
+  "identityPreflightFingerprint": "IDP-4ae1a62974cca3af",
+  "throughPeriodLabel": "2026 W33",
+  "periodCount": 85,
+  "productUniverse": {
+    "total": 1237,
+    "existingCatalog": 1041,
+    "weeklyAdded": 196
+  },
+  "sourceTotals": {
+    "factCount": 248572,
+    "salesNok": 490365140.75,
+    "quantity": 2499642.44
+  },
+  "stateCoverage": {
+    "Mapped": { "productCount": 929, "factCount": 229190, "salesNok": 479649885.1, "quantity": 2367590.46 },
+    "Unmapped": { "productCount": 302, "factCount": 19256, "salesNok": 10595207.65, "quantity": 131052.98 },
+    "Identity Pending": { "productCount": 6, "factCount": 126, "salesNok": 120048, "quantity": 999 },
+    "Conflict": { "productCount": 0, "factCount": 0, "salesNok": 0, "quantity": 0 },
+    "Inactive Target": { "productCount": 0, "factCount": 0, "salesNok": 0, "quantity": 0 }
+  },
+  "resolutionTypeCounts": {
+    "Inherited Main": 861,
+    "Inherited Subcategory": 19,
+    "Explicit Product": 49,
+    "Unmapped": 294,
+    "Explicit exclusion": 8,
+    "Identity Pending": 6
+  },
+  "identityPending": [
+    { "productId": "PRD-001102", "item": "Fuelbox Teams - English", "factCount": 2, "salesNok": 1299, "quantity": 1 },
+    { "productId": "PRD-001125", "item": "Hot Food Combo", "factCount": 3, "salesNok": 597, "quantity": 3 },
+    { "productId": "PRD-001138", "item": "Korean Fried Chicken", "factCount": 61, "salesNok": 116019, "quantity": 894 },
+    { "productId": "PRD-001187", "item": "Staff Coca Cola", "factCount": 8, "salesNok": 298, "quantity": 12 },
+    { "productId": "PRD-001214", "item": "Sumo Reusable Bag", "factCount": 46, "salesNok": 840, "quantity": 84 },
+    { "productId": "PRD-001223", "item": "Tempura Poke Bowl", "factCount": 6, "salesNok": 995, "quantity": 5 }
+  ],
+  "hierarchyAttentionProductIds": [
+    "PRD-000027", "PRD-000104", "PRD-000233", "PRD-000296", "PRD-000365",
+    "PRD-000449", "PRD-000596", "PRD-000689", "PRD-000870"
+  ]
+}

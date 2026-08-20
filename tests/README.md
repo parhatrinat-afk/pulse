@@ -15,6 +15,19 @@ fixtures. Run the complete suite with:
 
 `node --test tests/*.test.mjs`
 
+`build-0.3.0-weekly-mapping-attention.test.mjs` validates the derived one-row-
+per-Product weekly Mapping projection, exact 85-week Product/state evidence,
+Identity Pending separation, hierarchy attention, deterministic materialization
+geometry, Phase 1 freshness behavior, and Office Scripts compatibility. The
+projection is administrative evidence only and does not change mapping
+semantics or Performance.
+
+`build-0.3.0-mapping-ux-workspace.test.mjs` validates the category overview,
+recalculation-only category/view working set, bounded non-spill member selection
+table, backstage stable-ID resolution, intentional whole-category scope,
+atomic multi-node Assign/Leave-Unmapped/Remove contract, ancestor/descendant and
+Identity Pending guards, and retention of the full technical hierarchy audit.
+
 The Lovable migration suite validates the frozen 129-decision contract,
 Product exclusion precedence/lineage/denominator behavior, migration
 idempotency and `MAP-000001` reuse, Office Scripts compatibility guards, and

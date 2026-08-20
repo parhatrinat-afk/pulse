@@ -149,7 +149,7 @@ test("classification cannot change fact totals", () => {
   assert.equal(mapped.quantity + unmapped.quantity, total.quantity);
 });
 
-test("Office Script list validation uses resilient literal value sources", () => {
+test("Office Script validation keeps dynamic Mapping lists same-sheet and small lists literal", () => {
   const script = fs.readFileSync(
     new URL("../office-scripts/Build_0_3_0_Phase1.ts", import.meta.url),
     "utf8",
@@ -159,16 +159,22 @@ test("Office Script list validation uses resilient literal value sources", () =>
   )?.[0] ?? "";
 
   assert.ok(validationBody, "wireMappingValidation function must exist");
-  assert.equal((validationBody.match(/applyListValidation\(/g) ?? []).length, 7);
-  assert.equal((validationBody.match(/,activeGroupSource,/g) ?? []).length, 2);
+  assert.equal((validationBody.match(/applyListValidation\(/g) ?? []).length, 4);
+  assert.equal((validationBody.match(/,activeGroupSource,/g) ?? []).length, 1);
   assert.doesNotMatch(validationBody, /setRule\(\{list:\{[^}]*source:(?:actionSource|scopeSource|activeGroupSource|statusSource|ruleActionSource)/);
+  assert.match(validationBody, /applyRangeValidation\(sheet\.getRange\("B12"\), sheet\.getRange\("AQ2:AQ200"\)/);
+  assert.match(validationBody, /applyRangeValidation\(sheet\.getRange\("E12"\), sheet\.getRange\("AR2:AR10"\)/);
+  assert.match(validationBody, /applyLiteralValidation\(sheet\.getRange\("B13"\)/);
+  assert.match(validationBody, /applyLiteralValidation\(sheet\.getRange\("B15"\)/);
+  assert.match(validationBody, /applyLiteralValidation\(memberTable\.getColumn\("Select"\)/);
   assert.match(script, /sourceRange\.getValues\(\)\.forEach/);
   assert.match(script, /const source=items\.join\(","\)/);
   assert.match(script, /validation\.setRule\(\{list:\{inCellDropDown:true,source:source\}\}\)/);
+  assert.match(script, /validation\.setRule\(\{list:\{inCellDropDown:true,source:sourceRange\}\}\)/);
   assert.match(script, /catch\(error\)\{failures\.push/);
   assert.match(validationBody, /PUL-0301-013/);
-  assert.match(validationBody, /sheet\.getRange\("E8"\)\.setValue\(message\)/);
-  assert.match(script, /Dropdown validation ready \(7\/7\)/);
+  assert.match(validationBody, /sheet\.getRange\("A18"\)\.setValue\(message\)/);
+  assert.match(script, /Mapping workspace dropdowns ready \(10\/10\)/);
   assert.match(script, /"RuleAction"/);
   assert.match(script, /resolutionState: "Explicit exclusion", resolutionStatus: "Unmapped"/);
 });
