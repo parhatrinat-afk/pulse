@@ -175,6 +175,29 @@ test("Office Script remains compatible with the Office Scripts TypeScript target
   assertBalanced(officeScript);
 });
 
+test("Settings presentation is compact, business-facing, and keeps the Application Settings contract", () => {
+  assert.match(officeScript, /tblApplicationSettings/);
+  assert.match(officeScript, /Settings!A4:C12/);
+  assert.match(officeScript, /getRange\("A1:K1"\)\.merge\(\)/);
+  assert.match(officeScript, /setValue\("Settings"\)/);
+  assert.match(officeScript, /Manage Pulse configuration and reporting structure\./);
+  assert.match(officeScript, /Create a new active Reporting Group\. Pulse assigns the ID automatically\./);
+  assert.match(officeScript, /getRange\("G17:I17"\)\.merge\(\)/);
+  assert.match(officeScript, /getRange\("J17:K17"\).*setColor\(white\)/);
+  assert.match(officeScript, /getRange\("G18:K19"\)\.merge\(\)/);
+  assert.match(officeScript, /getRange\("G20:K21"\)\.merge\(\)/);
+  assert.doesNotMatch(officeScript, /getRange\("B:B"\).*setColumnWidth\(72\)/);
+  assert.doesNotMatch(officeScript, /getRange\("C:C"\).*setColumnWidth\(72\)/);
+  assert.doesNotMatch(officeScript, /setValue\("Setting"\)/);
+});
+
+test("Settings cleanup removes only contiguous stale overview residue", () => {
+  assert.match(officeScript, /function clearStaleSettingsOverviewRows/);
+  assert.match(officeScript, /status !== "Active" && status !== "Inactive"/);
+  assert.match(officeScript, /typeof values\[index\]\[2\] !== "number"/);
+  assert.match(officeScript, /getRangeByIndexes\(firstRowIndex, 0, staleRows, 4\)\.clear/);
+});
+
 function groups(count) {
   return Array.from({ length: count }, (_, index) => group(index + 1));
 }

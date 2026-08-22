@@ -15,6 +15,8 @@ rows, and are never reused.
 
 The visible `Settings` sheet contains:
 
+- a full-width Settings header and a readable three-column Application
+  Settings block whose existing table contract remains unchanged;
 - a business-facing Reporting Groups overview: Reporting Group, Status,
   Products, and Sales NOK;
 - a compact New Reporting Group form: Name, optional Description, optional

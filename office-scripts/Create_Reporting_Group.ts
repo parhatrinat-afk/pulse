@@ -220,34 +220,127 @@ function ensureSettingsSurface(
     settings.getRange("F15:K15").merge();
     settings.getRange("F15").setValue("New Reporting Group");
     settings.getRange("F16:K16").merge();
-    settings.getRange("F16").setValue("Create one active business classification. Pulse assigns the stable ID.");
+    settings.getRange("F16").setValue("Create a new active Reporting Group. Pulse assigns the ID automatically.");
     settings.getRange("F17").setValue("Name");
-    settings.getRange("G17:K17").merge();
+    settings.getRange("G17:I17").merge();
     settings.getRange("F18").setValue("Description");
     settings.getRange("G18:K19").merge();
     settings.getRange("F20").setValue("Notes");
     settings.getRange("G20:K21").merge();
     settings.getRange("F22:K22").merge();
-    settings.getRange("F22").setValue("Run Create Reporting Group from Automate to validate and create.");
+    settings.getRange("F22").setValue("Enter the details, then run Create Reporting Group from Automate.");
     settings.getRange("F23").setValue("Status");
     settings.getRange("G23:K24").merge();
   }
+  formatSettingsPresentation(workbook, settings);
+}
+
+function formatSettingsPresentation(workbook: ExcelScript.Workbook, settings: ExcelScript.Worksheet): void {
   const navy = "#17365D";
+  const blue = "#1F4E78";
+  const tableBlue = "#4472C4";
   const paleBlue = "#D9EAF7";
   const input = "#FFF4CE";
-  settings.getRange("F15:K15").getFormat().getFill().setColor(navy);
-  settings.getRange("F15:K15").getFormat().getFont().setColor("#FFFFFF");
-  settings.getRange("F15:K15").getFormat().getFont().setBold(true);
+  const white = "#FFFFFF";
+  const ink = "#17365D";
+  const applicationSettings = requiredTable(workbook, "tblApplicationSettings");
+  if (applicationSettings.getRange().getAddress() !== "Settings!A4:C12") {
+    throw new Error("PUL-030RG-012: tblApplicationSettings moved; Settings presentation was not changed.");
+  }
+
+  settings.getRange("A1:K3").unmerge();
+  settings.getRange("A1:K1").merge();
+  settings.getRange("A2:K2").merge();
+  settings.getRange("A3:C3").merge();
+  settings.getRange("A1").setValue("Settings");
+  settings.getRange("A2").setValue("Manage Pulse configuration and reporting structure.");
+  settings.getRange("A3").setValue("Application Settings");
+
+  settings.getRange("F15:K24").unmerge();
+  settings.getRange("F15:K15").merge();
+  settings.getRange("F16:K16").merge();
+  settings.getRange("G17:I17").merge();
+  settings.getRange("G18:K19").merge();
+  settings.getRange("G20:K21").merge();
+  settings.getRange("F22:K22").merge();
+  settings.getRange("G23:K24").merge();
+  settings.getRange("F15").setValue("New Reporting Group");
+  settings.getRange("F16").setValue("Create a new active Reporting Group. Pulse assigns the ID automatically.");
+  settings.getRange("F17").setValue("Name");
+  settings.getRange("F18").setValue("Description");
+  settings.getRange("F20").setValue("Notes");
+  settings.getRange("F22").setValue("Enter the details, then run Create Reporting Group from Automate.");
+  settings.getRange("F23").setValue("Status");
+
+  settings.getRange("A1:K25").getFormat().getFont().setName("Carlito");
+  settings.getRange("A1:K25").getFormat().getFont().setSize(11);
+  settings.getRange("A1:K25").getFormat().setVerticalAlignment(ExcelScript.VerticalAlignment.center);
+  settings.getRange("A1:K25").getFormat().setWrapText(false);
+
+  settings.getRange("A1:K1").getFormat().getFill().setColor(navy);
+  settings.getRange("A1:K1").getFormat().getFont().setColor(white);
+  settings.getRange("A1:K1").getFormat().getFont().setBold(true);
+  settings.getRange("A1:K1").getFormat().getFont().setSize(18);
+  settings.getRange("A2:K2").getFormat().getFill().setColor(paleBlue);
+  settings.getRange("A2:K2").getFormat().getFont().setColor(ink);
+  settings.getRange("A2:K2").getFormat().setWrapText(true);
+
+  for (const address of ["A3:C3", "A15:D15", "F15:K15"]) {
+    settings.getRange(address).getFormat().getFill().setColor(blue);
+    settings.getRange(address).getFormat().getFont().setColor(white);
+    settings.getRange(address).getFormat().getFont().setBold(true);
+    settings.getRange(address).getFormat().getFont().setSize(12);
+  }
+  settings.getRange("A4:C4").getFormat().getFill().setColor(tableBlue);
+  settings.getRange("A4:C4").getFormat().getFont().setColor(white);
+  settings.getRange("A4:C4").getFormat().getFont().setBold(true);
+  settings.getRange("A5:A12").getFormat().getFill().setColor(white);
+  settings.getRange("B5:B12").getFormat().getFill().setColor(input);
+  settings.getRange("B5:B12").getFormat().getFont().setBold(true);
+  settings.getRange("C5:C12").getFormat().getFill().setColor(white);
+  settings.getRange("C5:C12").getFormat().setWrapText(true);
+  settings.getRange("A4:C12").getFormat().setHorizontalAlignment(ExcelScript.HorizontalAlignment.left);
+
+  settings.getRange("A16:A40").getFormat().setHorizontalAlignment(ExcelScript.HorizontalAlignment.left);
+  settings.getRange("B16:C40").getFormat().setHorizontalAlignment(ExcelScript.HorizontalAlignment.center);
+  settings.getRange("D16:D40").getFormat().setHorizontalAlignment(ExcelScript.HorizontalAlignment.right);
   settings.getRange("F16:K16").getFormat().getFill().setColor(paleBlue);
-  settings.getRange("G17:K21").getFormat().getFill().setColor(input);
+  settings.getRange("F16:K16").getFormat().setWrapText(true);
   settings.getRange("F17:F23").getFormat().getFont().setBold(true);
-  settings.getRange("F15:K24").getFormat().setVerticalAlignment(ExcelScript.VerticalAlignment.center);
+  settings.getRange("G17:I17").getFormat().getFill().setColor(input);
+  settings.getRange("J17:K17").getFormat().getFill().setColor(white);
+  settings.getRange("G18:K19").getFormat().getFill().setColor(input);
+  settings.getRange("G20:K21").getFormat().getFill().setColor(input);
+  settings.getRange("G17:K24").getFormat().setHorizontalAlignment(ExcelScript.HorizontalAlignment.left);
   settings.getRange("F16:K24").getFormat().setWrapText(true);
+  settings.getRange("F22:K22").getFormat().getFont().setBold(false);
+  settings.getRange("F22:K22").getFormat().getFont().setItalic(true);
+
+  const statusText = text(settings.getRange("G23").getValue());
+  const statusError = statusText.indexOf("Not created") === 0 || statusText.indexOf("Creation failed") === 0;
+  formatSettingsStatus(settings, statusError);
+
+  settings.getRange("1:1").getFormat().setRowHeight(34);
+  settings.getRange("2:2").getFormat().setRowHeight(28);
+  settings.getRange("3:4").getFormat().setRowHeight(26);
+  settings.getRange("5:12").getFormat().setRowHeight(28);
+  settings.getRange("7:7").getFormat().setRowHeight(36);
+  settings.getRange("9:9").getFormat().setRowHeight(40);
+  settings.getRange("11:11").getFormat().setRowHeight(36);
+  settings.getRange("13:14").getFormat().setRowHeight(9);
   settings.getRange("15:17").getFormat().setRowHeight(26);
-  settings.getRange("18:21").getFormat().setRowHeight(22);
+  settings.getRange("18:21").getFormat().setRowHeight(23);
   settings.getRange("22:24").getFormat().setRowHeight(26);
-  settings.getRange("F:F").getFormat().setColumnWidth(96);
-  settings.getRange("G:K").getFormat().setColumnWidth(82);
+  settings.getRange("25:40").getFormat().setRowHeight(24);
+
+  settings.getRange("A:A").getFormat().setColumnWidth(125);
+  settings.getRange("B:B").getFormat().setColumnWidth(155);
+  settings.getRange("C:C").getFormat().setColumnWidth(190);
+  settings.getRange("D:D").getFormat().setColumnWidth(90);
+  settings.getRange("E:E").getFormat().setColumnWidth(12);
+  settings.getRange("F:F").getFormat().setColumnWidth(82);
+  settings.getRange("G:G").getFormat().setColumnWidth(60);
+  settings.getRange("H:K").getFormat().setColumnWidth(45);
   settings.getFreezePanes().freezeRows(3);
 }
 
@@ -286,15 +379,36 @@ function refreshSettingsOverview(
   }
   if (rows.length) table.getRangeBetweenHeaderAndTotal().setValues(rows);
   table.setPredefinedTableStyle("TableStyleMedium2");
+  clearStaleSettingsOverviewRows(settings, target.getRowIndex() + target.getRowCount());
   const products = table.getColumnByName("Products");
   const sales = table.getColumnByName("Sales NOK");
   if (!products || !sales) throw new Error("PUL-030RG-005: Settings overview columns are missing.");
   products.getRangeBetweenHeaderAndTotal().setNumberFormat("#,##0");
   sales.getRangeBetweenHeaderAndTotal().setNumberFormat("#,##0.00");
-  settings.getRange("A:A").getFormat().setColumnWidth(142);
-  settings.getRange("B:B").getFormat().setColumnWidth(72);
-  settings.getRange("C:C").getFormat().setColumnWidth(72);
-  settings.getRange("D:D").getFormat().setColumnWidth(104);
+  settings.getRange("A:A").getFormat().setColumnWidth(125);
+  settings.getRange("B:B").getFormat().setColumnWidth(155);
+  settings.getRange("C:C").getFormat().setColumnWidth(190);
+  settings.getRange("D:D").getFormat().setColumnWidth(90);
+}
+
+function clearStaleSettingsOverviewRows(settings: ExcelScript.Worksheet, firstRowIndex: number): void {
+  const used = settings.getUsedRange(true);
+  if (!used) return;
+  const usedEnd = used.getRowIndex() + used.getRowCount();
+  if (usedEnd <= firstRowIndex) return;
+  const probeRowCount = Math.min(usedEnd - firstRowIndex, 20);
+  const probe = settings.getRangeByIndexes(firstRowIndex, 0, probeRowCount, 4);
+  const values = probe.getValues();
+  let staleRows = 0;
+  for (let index = 0; index < values.length; index += 1) {
+    const status = text(values[index][1]);
+    if (!text(values[index][0]) || (status !== "Active" && status !== "Inactive")) break;
+    if (typeof values[index][2] !== "number" || typeof values[index][3] !== "number") break;
+    staleRows += 1;
+  }
+  if (staleRows > 0) {
+    settings.getRangeByIndexes(firstRowIndex, 0, staleRows, 4).clear(ExcelScript.ClearApplyTo.all);
+  }
 }
 
 function reportingGroupImpacts(workbook: ExcelScript.Workbook): { [key: string]: { products: number; facts: number; sales: number } } {
@@ -718,6 +832,10 @@ function applyRangeValidation(target: ExcelScript.Range, source: ExcelScript.Ran
 
 function writeSettingsStatus(settings: ExcelScript.Worksheet, message: string, error: boolean): void {
   settings.getRange("G23").setValue(message);
+  formatSettingsStatus(settings, error);
+}
+
+function formatSettingsStatus(settings: ExcelScript.Worksheet, error: boolean): void {
   settings.getRange("G23:K24").getFormat().getFill().setColor(error ? "#FCE8E6" : "#E2F0D9");
   settings.getRange("G23:K24").getFormat().getFont().setColor(error ? "#A83126" : "#17365D");
   settings.getRange("G23:K24").getFormat().getFont().setBold(true);
