@@ -4,6 +4,12 @@ This directory contains Office Scripts used to build, repair, validate, or admin
 
 Current scripts include:
 
+- `Create_Reporting_Group.ts` — user-facing administrator entry point that
+  creates one validated active row in `tblReportingGroups`, refreshes the
+  count-driven Mapping/Performance selectors, and truthfully marks weekly
+  Performance refresh required. It does not create Mapping Rules or rebuild a
+  weekly cache.
+
 - `Build_0_2_0.ts` — reproducible Build 0.2.0 implementation path.
 - `Pre_0_3_0_QA_FIX.ts` — pre-0.3.0 QA corrections applied to the validated checkpoint.
 - `Build_0_3_0_Phase1.ts` — rerunnable Reporting Groups, hierarchy mapping,

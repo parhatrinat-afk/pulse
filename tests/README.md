@@ -15,6 +15,12 @@ fixtures. Run the complete suite with:
 
 `node --test tests/*.test.mjs`
 
+`build-0.3.0-reporting-group-create.test.mjs` covers stable next-ID allocation,
+authority validation, duplicate rejection, zero-member creation, preserved
+stable-ID selections, required cache staleness, and the bounded Office Scripts
+entry point. The companion checklist covers the reversible live `RPG-0010`
+gate without leaving a QA group in the canonical workbook.
+
 `build-0.3.0-weekly-mapping-attention.test.mjs` validates the derived one-row-
 per-Product weekly Mapping projection, exact 85-week Product/state evidence,
 Identity Pending separation, hierarchy attention, deterministic materialization
