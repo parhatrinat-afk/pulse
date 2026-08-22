@@ -1,37 +1,18 @@
-# Pulse pre-Codex repository patch
+# Obsolete repository-bootstrap instructions
 
-This folder mirrors only the repository paths that should be added or replaced before starting Codex Phase 1.
+This file is retained only as historical evidence of the pre-Codex repository
+bootstrap. It is **not** a Pulse workbook upload or weekly intake procedure.
 
-## Replace existing files
+Do not follow the former 0.2.0/manual-upload workflow and do not create workbook
+copies from these instructions.
 
-- `README.md`
-- `CHANGELOG.md`
-- `ROADMAP.md`
-- `tests/README.md`
-- `office-scripts/README.md`
-- `releases/README.md`
+Current operational procedure:
 
-## Add new files
+- use the canonical workbook
+  `OneDrive/Pulse/Development/Pulse_Current.xlsx`;
+- place untouched weekly POS reports in
+  `OneDrive/Pulse/Incoming reports`;
+- follow [the Pulse 0.3.0 operations runbook](docs/BUILD_0_3_0_OPERATIONS_RUNBOOK.md).
 
-- `AGENTS.md`
-- `docs/BUILD_0_3_0_SPEC.md`
-- `CODEX_TASK_0_3_0_PHASE1.md`
-
-## Important
-
-Do **not** delete other repository files or folders.
-
-Do **not** upload this wrapper file (`UPLOAD_INSTRUCTIONS.md`) into the Pulse repository unless you want to keep it; it is only a checklist for the manual upload.
-
-After these files are committed, the repository should state:
-
-- validated checkpoint: **0.2.0-QA**
-- active development: **0.3.0 — Mapping + Reporting Groups**
-- 0.3.0 is **not yet released**
-- mapping is hierarchical and Lovable-style: map at the highest safe level, inherit to descendants, and allow more-specific overrides.
-
-Recommended next development branch:
-
-`build/0.3.0-mapping-phase1`
-
-Then give Codex the task in `CODEX_TASK_0_3_0_PHASE1.md`.
+GitHub remains authoritative for scripts, tests and documentation. A separate
+workbook copy is created only for an explicitly approved release/checkpoint.

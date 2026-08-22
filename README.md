@@ -1,91 +1,86 @@
 # Pulse
 
-Pulse is an operational performance and reporting platform designed to turn trusted business data into clear, neutral performance views and meeting-ready reporting.
+Pulse is an operational performance and reporting workbook. It turns trusted
+weekly POS exports into deterministic, explainable management views while
+preserving source lineage and human control over business classification.
 
-## Current status
+## Release status
 
-**Current validated checkpoint:** Build 0.2.0-QA  
-**Active development:** Build 0.3.0 — Mapping + Reporting Groups
+**Current candidate:** Pulse 0.3.0, validated through 2026 W33
+**Remaining release gate:** one controlled Power Automate `New -> Published`
+pilot using the production flow
 
-Phase 1, Phase 2A, and the approved Lovable mapping migration have passed live
-Excel-for-web QA. Phase 2B has also passed live Excel-for-web calculation,
-restaurant-scope, reconciliation, and rerun QA: it validates the Phase 2A
-bridge, materializes centralized Reporting Group Sales Share results in
-`_Metric_Calc`, and cuts the existing Performance/Reports path over without a
-visual redesign or mandatory channel selector. Phase 2C and its bounded IA and
-visual slices are implemented and accepted in live Excel with all 16
-Interaction QA checks passing. The checkpoint adds formula-driven Yes/No
-restaurant and Reporting Group selection, selected-RPG Totals, numeric
-restaurant sorting, a weighted Grand Total, and five matrix views without
-requiring scripts during normal use. Build 0.2.0-QA remains the
-validated release checkpoint until Build 0.3.0 release acceptance.
+The repository is the source of truth for scripts, tests, documentation and
+reproducible build logic. The single development workbook is
+`OneDrive/Pulse/Development/Pulse_Current.xlsx`; workbook binaries and weekly
+source reports are not stored in Git.
 
-The bounded weekly parser and identity preflight are checkpointed. The next
-candidate compact weekly cache now aggregates the accepted 84-week corpus into
-versioned Restaurant/week scope denominators and dense nine-RPG additive
-components in repository/test space. It remains inactive and is not connected
-to Performance or materialized in the canonical workbook.
+## Normal workbook experience
 
-The Excel workbook is currently the user-facing product. The repository is the source of truth for product rules, metric logic, tests, documentation, Office Scripts, and reproducible build assets.
+Pulse exposes six normal-use sheets:
 
-## Canonical development workbook
+1. **Overview** — current management summary, attention and data status.
+2. **Performance** — independent Current/Compare weekly ranges, restaurant and
+   Reporting Group selection, shares, PP change, Sales NOK and NOK Impact.
+3. **Reports** — meeting-ready detail linked to the same Performance result.
+4. **Imports** — latest published week, historical coverage and genuine intake
+   activity.
+5. **Mapping** — hierarchy browsing, bulk assignment, inherited/custom state
+   and weekly historical attention.
+6. **Settings** — application configuration and Reporting Group administration.
 
-The single authoritative development workbook is
-`OneDrive/Pulse/Development/Pulse_Current.xlsx`. Normal development continues
-in that same workbook. Prefer its connected live Excel session for inspection
-and QA; if it cannot be accessed, stop and ask rather than searching other
-folders or substituting another copy. Create a separate workbook only when an
-explicit checkpoint or release copy is requested. GitHub remains the source of
-truth for code, scripts, tests, and documentation.
+Engineering, lineage, reconciliation and rollback surfaces remain hidden but
+available for controlled maintenance and QA.
 
-Build 0.3.0 introduces the semantic layer between source-system classifications and reporting:
+## Current product foundation
 
-`Raw POS data → Source hierarchy → Hierarchical Mapping → Reporting Groups → Metrics / KPIs → Performance`
+- Weekly coverage: **2025 W01–W52 and 2026 W01–W33**.
+- A versioned compact weekly cache keeps one Active authority and one previous
+  full rollback version.
+- The Power Automate intake contract supports New, Duplicate, Correction
+  Review, Rejected and Cache Stale outcomes.
+- Duplicate reports are safe no-ops. A New report is first built as a complete
+  inactive Candidate, reconciled, then activated through a final authority
+  switch.
+- Mapping uses stable IDs and the source hierarchy. The most-specific active
+  explicit rule wins; otherwise a product inherits the nearest mapped ancestor
+  or remains Unmapped.
+- Reporting Groups are editable business classifications, not KPIs or POS
+  categories. Current runtime and weekly cache logic support a dynamic positive
+  number of active groups.
+- Performance and Reports consume the same centralized weekly additive
+  components. Shares are calculated only after period/scope aggregation.
+- Unmapped, Identity Pending, Conflict and Inactive Target facts remain visible
+  and in source denominators; they never silently disappear.
+- Raw source reports, legacy facts and historical lineage are not rewritten by
+  mapping.
 
-Reporting Groups are business-defined groupings such as Add-ons, Non-Alcohol, Spirits/Cocktails, Coffee & Tea, Beer & Cider, Desserts, Wine & Sake, Starters, and Mains. They are not KPIs. Metrics operate on Reporting Groups.
+## Architecture
 
-## Mapping principle
+`Untouched weekly POS report -> Parser -> Identity preflight -> Hierarchical Mapping -> Versioned weekly cache -> Metrics -> Performance / Reports / Overview`
 
-Pulse should make it easy to browse the source hierarchy and map at the highest safe level.
+Source and business semantics remain separate:
 
-- A broader source node may provide an inherited Reporting Group to its descendants.
-- A more-specific explicit mapping overrides an inherited mapping.
-- The current POS hierarchy may expose levels such as Main Category → Subcategory → Product, but the architecture should not assume those are the only hierarchy levels Pulse will ever support.
-- Raw source data is never rewritten by mapping.
-- Human control over mapping and Reporting Group configuration is preserved.
-- Active/inactive Reporting Groups control what becomes available to Performance.
+- POS main category, subcategory and product are source hierarchy.
+- Reporting Groups are business-owned classification.
+- Metrics and KPIs operate on Reporting Groups.
+- Current and comparison periods are independent selections.
+- Mapping and identity changes require a truthful cache refresh rather than
+  rewriting history.
 
-## Product principles
+See [architecture.md](docs/architecture.md),
+[pulse-principles.md](docs/pulse-principles.md), and the
+[operations runbook](docs/BUILD_0_3_0_OPERATIONS_RUNBOOK.md).
 
-- Trust before insight.
-- Pulse observes; humans decide.
-- Business context and conclusions remain human-owned.
-- Do not hide or remove capabilities without real-world evidence.
-- Complexity may live underneath the product, but normal use should remain simple.
-- KPI calculations must be deterministic, explainable, and reproducible.
-- The base product must remain source-system and restaurant neutral.
-- Uploaded datasets are not inherently baselines; current and comparison references are user-selected.
-- Dataset channel/scope such as In-house or Takeaway is metadata/context, not a mandatory KPI definition.
-- Do not destroy or overwrite raw source data when mapping.
+## Development and release discipline
 
-## Repository structure
+- Do not search for or substitute workbook copies. Use the connected canonical
+  workbook or stop and ask for access.
+- Do not commit source-report or development-workbook binaries.
+- Run the complete deterministic suite with:
 
-- `excel/` — validated workbook checkpoints and workbook artifacts.
-- `src/` — implementation logic, organized by responsibility.
-- `office-scripts/` — Excel automation and build/QA scripts.
-- `tests/` — deterministic validation, expected outputs, and regression checks.
-- `docs/` — architecture, product principles, data model, KPI definitions, QA findings, and active build specifications.
-- `releases/` — release notes and validated release/checkpoint material.
-- `AGENTS.md` — repository-wide engineering rules for coding agents, including Codex.
+  `node --test tests/*.test.mjs`
 
-## Current user journey
-
-`Overview → Performance → Reports → Imports → Settings`
-
-Administration and engine sheets remain available behind the primary user-facing workflow during development.
-
-## Development rule
-
-A build number is only advanced when there is a concrete, validated artifact or reproducible implementation change. Discussion alone is not a build.
-
-Build 0.3.0 is **in development**, not released. Build 0.2.0-QA remains the validated checkpoint until 0.3.0 has a validated artifact and QA evidence.
+- A build becomes a release only after repository validation, live Excel QA,
+  the production Power Automate New-path pilot, controlled merge and explicit
+  release acceptance.

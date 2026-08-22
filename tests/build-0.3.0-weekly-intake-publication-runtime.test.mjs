@@ -49,6 +49,8 @@ test("publication planning is deterministic and does not mutate prior Active or 
   assert.deepEqual(first, second);
   assert.deepEqual(fixture, before);
   assert.equal(first.ledgerEntry.intakeStatus, "Published");
+  assert.equal(first.ledgerEntry.sourceLocator,
+    "OneDrive/Pulse/Incoming reports/W33.xlsx");
   assert.match(first.ledgerEntry.intakeEventId, /^WINT-[0-9a-f]{16}$/);
 });
 
@@ -111,6 +113,8 @@ test("Office Script exposes two bounded calls and keeps authority switch final",
   assert.match(script, /tblWeeklyIdentityRegistryControl/);
   assert.match(script, /validateIdentityRegistryCarryForward/);
   assert.match(script, /activation was already complete/);
+  assert.match(script, /sourceLocator: ledgerSourceLocator\(workbook, key, semantic\)/);
+  assert.match(script, /row\[periodIndex\] === period && row\[semanticIndex\] === semantic/);
 });
 
 test("accepted 84-week identity registry installer is narrow and idempotent", () => {

@@ -121,6 +121,14 @@ contains no raw-fact/cache reads, aggregation, ranking, period engine, selector,
 or parallel business-result table. It also locks stale-state suppression,
 dynamic Reporting Group behavior, operational status sources, and navigation.
 
+The release-state cleanup suite locks the bounded zero-selection Mapping reset,
+NOK organisation-currency configuration, descriptive/non-authoritative
+`_Environment` metadata, unchanged W33/rollback/mapping authorities, serialized
+Power Automate retry/recovery contract, production Office Scripts manifest,
+current 0.3.0 candidate documentation, known W33 SourceLocator exception and
+`.DS_Store` ignore policy. Publication-runtime coverage separately proves that
+a supplied New-event source locator survives into the Published ledger entry.
+
 The weekly intake publisher/adapter suites validate dynamic Active authority,
 all five intake outcomes, deterministic inactive Candidate construction,
 idempotent hidden-ledger behavior, bounded Candidate payloads, typed

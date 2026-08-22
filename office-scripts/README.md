@@ -1,102 +1,62 @@
-# office-scripts
+# Pulse Office Scripts
 
-This directory contains Office Scripts used to build, repair, validate, or administer the Pulse Excel workbook.
+Only a small subset of this directory is required in Excel for the web during
+normal operation. Keep the Excel Automate copies identical to the accepted
+repository sources.
 
-Current scripts include:
+## Recurring production scripts
 
-- `Create_Reporting_Group.ts` — user-facing administrator entry point that
-  creates one validated active row in `tblReportingGroups`, refreshes the
-  count-driven Mapping/Performance selectors, and truthfully marks weekly
-  Performance refresh required. It does not create Mapping Rules or rebuild a
-  weekly cache.
+These three scripts must exist in the operator's Excel Automate library:
 
-- `Build_0_2_0.ts` — reproducible Build 0.2.0 implementation path.
-- `Pre_0_3_0_QA_FIX.ts` — pre-0.3.0 QA corrections applied to the validated checkpoint.
-- `Build_0_3_0_Phase1.ts` — rerunnable Reporting Groups, hierarchy mapping,
-  Effective Mapping, browse/action, and QA foundation. It intentionally leaves
-  Performance and Reports on the 0.2.0 metric path.
-- `Build_0_3_0_Phase2A.ts` — validates current Effective Mapping, materializes
-  one Reporting Group analysis row per immutable sales fact, fingerprints the
-  mapping state, adds reconciliation/coverage QA, and supports human-authored
-  legacy CAT/RPG comparisons. It leaves `_Metric_Calc`, Performance, Reports,
-  KPI Registry, and KPI-0001 unchanged.
-- `Build_0_3_0_Phase2B.ts` — validates Phase 2A bridge freshness and one-to-one
-  source reconciliation before mutation, materializes centralized KPI-0001
-  Reporting Group results in `_Metric_Calc`, and cuts the existing Performance
-  and Reports presentation over without restoring mandatory channel UI or
-  redesigning the page. Active, ReportingEnabled RestaurantIDs define the
-  auditable Company scope; excluded restaurants remain untouched in source and
-  Phase 2A.
-- `Build_0_3_0_Phase2C.ts` — validates the accepted Phase 2B result grain and
-  Company controls, then installs stable-ID Yes/No restaurant and Reporting
-  Group selection, additive component helpers, a bounded numeric display helper,
-  selected-RPG Total helpers, numeric presentation sorting, and a formula-driven
-  Performance text facade. Normal selection, sorting, display, and dataset
-  exploration requires recalculation only; the script does not create another
-  metric engine or restaurant combinations.
-- `Build_0_3_0_UX_IA_Slice1.ts` — runs after an accepted 16/16 Phase 2C
-  checkpoint, exposes and orders the six primary workflow sheets, normally hides
-  all 41 supporting sheets, installs five ordinary Overview hyperlinks, and
-  resets the six primary saved views to A1. It does not change calculations,
-  tables, formats, mappings, imports, or facts.
-- `Build_0_3_0_UX_Visual_Slice2A.ts` — runs after accepted Phase 2C + IA Slice
-  1, applies the restrained Pulse visual system to the six primary sheets,
-  repairs Reports clipping, and replaces the technical Performance Explain
-  block with four operational rows. Formula and protected table fingerprints
-  must remain unchanged before/after the presentation-only pass.
-- `Build_0_3_0_UX_Visual_Slice2B.ts` — runs after accepted Visual Slice 2A and
-  performs the final pre-checkpoint Performance/Mapping cleanup for comfortable
-  100% zoom. Values, formulas, tables, validation, selections, QA, and sheet
-  state are fingerprinted or revalidated before/after the bounded formatting.
-- `Migrate_Lovable_Mapping.ts` — idempotently applies the approved 129-rule
-  Lovable business-definition migration using stable Pulse node/product and
-  Reporting Group IDs. It reuses semantically identical active rules and adds
-  the eight approved Product exclusions without changing facts or metric
-  presentation.
-- `Parse_Weekly_Sales_Report.ts` — read-only parser adapter for one untouched
-  weekly `Sales per Item` export. It derives period identity from `A1`, validates
-  the exact seven-column schema, returns normalized source rows and a
-  filename-independent manifest, and performs no staging, publication, mapping,
-  cache, or workbook mutation.
-- `Materialize_Weekly_Compact_Cache.ts` — validates the accepted date-neutral
-  weekly mapping/catalog state, writes the deterministic 84-week compact cache
-  through hidden staging, reconciles/fingerprints the complete candidate, and
-  leaves it `Candidate` / `Not Active`. It does not cut Performance over.
-- `Activate_Weekly_Compact_Cache.ts` — revalidates the exact materialized cache,
-  current mapping/catalog/ReportingEnabled content, reconciliation and Phase 2C
-  QA before changing only the accepted version's two authority fields to
-  `Active`. It does not add period selectors or cut Performance over.
-- `Build_0_3_0_Weekly_Performance.ts` — validates the exact fresh Active cache,
-  installs independent Year/From week/To week controls, and sizes the accepted
-  Phase 2C component/presentation layers from the active Reporting Group count.
-  Stable-ID selections are preserved and newly active groups default `No`.
-  Invalid or incomplete ranges remain blocked. Its stable management outputs
-  expose selected-scope metrics and full-precision Top/Bottom 3 rankings for
-  downstream presentation facades without duplicating the metric engine.
-- `Build_0_3_0_Overview.ts` — replaces the obsolete Overview shell with the
-  management landing-page facade. It projects only accepted Performance,
-  Imports, and Mapping outputs; it does not read facts/cache rows, aggregate,
-  rank, or recreate period/freshness logic.
-- `Build_0_3_0_Performance_Presentation_Cleanup.ts` — runs after the accepted
-  weekly Performance cutover, moves the two existing native selection tables
-  below Explain, balances matrix widths/alignment, and updates the obsolete
-  dataset wording. It fingerprints formulas, selections, validations, Reports,
-  rollback results, Imports, and both 16/16 QA surfaces before/after.
+| Excel script name | Repository source | Runs against | Purpose |
+|---|---|---|---|
+| Parse Weekly Sales Report | `Parse_Weekly_Sales_Report.ts` | Untouched weekly POS workbook | Returns content-derived period, rows, totals and fingerprints without modifying the source. |
+| Process Weekly Intake | `Process_Weekly_Intake.ts` | Canonical Pulse workbook | Validates Active freshness, classifies the event and records non-New outcomes. |
+| Publish Weekly Intake | `Publish_Weekly_Intake.ts` | Canonical Pulse workbook | Builds a complete inactive Candidate and activates it only after full validation. |
 
-Build 0.3.0 scripts should preserve the existing workbook unless an explicit migration is required. They must not rewrite raw imported source data as part of mapping.
+The production Power Automate flow is serialized at concurrency 1. It must pass
+the source OneDrive item identifier as `sourceLocator`, branch on the typed
+script results, and archive only a safe Duplicate or Published outcome. See the
+[operations runbook](../docs/BUILD_0_3_0_OPERATIONS_RUNBOOK.md).
 
-After Phase 2C is live-validated, apply UX IA Slice 1 as a separate final step.
-Its exact 47-sheet and 16/16 QA preflight prevents navigation state from being
-applied to an incompatible checkpoint.
+## Administrative scripts
 
-After IA Slice 1 is accepted, apply Visual Slice 2A. It validates the IA state
-and 16/16 Phase 2C QA before formatting; no Office Script rerun is needed for
-normal Performance exploration after the visual pass.
+Install these in Excel Automate when the corresponding administrator workflow
+is available:
 
-Where practical, scripts should be:
+| User-facing purpose | Repository source | When to run |
+|---|---|---|
+| Apply Mapping Changes | `Build_0_3_0_Phase1.ts` | After a validated Mapping selection/action. It rebuilds Effective Mapping and marks Performance refresh required when content changes. |
+| Create Reporting Group | `Create_Reporting_Group.ts` | From the Settings creation form. It creates one stable active group and does not create Mapping Rules. |
+| Refresh Weekly Performance | `Build_0_3_0_Weekly_Performance.ts` | After a structurally changed active group/cache state when the accepted refresh process requires reinstalling the formula surface. Ordinary selectors never require it. |
 
-- deterministic and repeatable;
-- safe to rerun or explicit about non-idempotent behavior;
-- scoped to the smallest necessary workbook changes;
-- documented with prerequisites and expected postconditions;
-- validated against the current checkpoint before release.
+## Installer, build and QA scripts
+
+The remaining scripts are repository-controlled installation, migration,
+presentation or validation assets. Operators do not run them during a normal
+weekly intake:
+
+- `Install_Weekly_Identity_Registry.ts`
+- `Materialize_Weekly_Compact_Cache.ts`
+- `Activate_Weekly_Compact_Cache.ts`
+- `Materialize_Weekly_Mapping_Attention.ts`
+- `Migrate_Lovable_Mapping.ts`
+- `Build_0_3_0_Phase2A.ts`, `Build_0_3_0_Phase2B.ts`,
+  `Build_0_3_0_Phase2C.ts`
+- `Build_0_3_0_Overview.ts`
+- `Build_0_3_0_UX_*.ts`, presentation-cleanup and Imports-cleanup scripts
+- `Build_0_3_0_Release_State_Cleanup.ts`
+- pre-0.3.0 and Build 0.2.0 build/QA scripts
+
+These scripts remain valuable reproducible evidence. Do not delete them merely
+because their workbook surfaces are already installed.
+
+## Safety boundary
+
+- Untouched source reports are never modified by the parser.
+- A Candidate is never authoritative.
+- Activation retains one prior full rollback version and changes authority only
+  after all canonical rows are written and revalidated.
+- Mapping and Reporting Group changes make stale weekly results unavailable;
+  administrators must rebuild rather than edit hidden fingerprints.
+- Workbook binaries and source reports do not belong in this repository.

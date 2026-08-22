@@ -4,6 +4,47 @@ All meaningful Pulse changes are recorded here.
 
 ## Unreleased — 0.3.0 — Mapping + Reporting Groups
 
+### Release-candidate state through 2026 W33
+
+- Activated the validated compact weekly authority through 85 periods:
+  2025 W01–W52 and 2026 W01–W33. The Active version retains the accepted prior
+  84-period full version for rollback and reconciles facts, Sales NOK, Quantity,
+  mapping states and dense Reporting Group components.
+- Added the production weekly intake contract: untouched content-driven parser,
+  exact identity preflight, dynamic hierarchical mapping, New/Duplicate/
+  Correction Review/Rejected/Cache Stale classification, hidden intake ledger,
+  complete Candidate construction and a final validated authority switch.
+- Proved Duplicate end to end through Power Automate and proved genuine W33
+  Candidate/activation in live Excel. The final release gate remains one
+  controlled Power Automate New-to-Published pilot.
+- Cut Performance and Reports over to independent Current/Compare ISO-week
+  ranges sourced from the single Active weekly cache. Preserved restaurant and
+  Reporting Group selection, weighted Total/Grand Total, sorting, five display
+  modes and current-sales-base NOK Impact without script reruns for exploration.
+- Added a live management Overview that projects accepted Performance, Imports
+  and Mapping authorities without a second calculation or ranking engine.
+- Added the operational Imports view with latest week, coverage and genuine
+  intake activity only.
+- Added the weekly Mapping attention projection, hierarchy/category workspace,
+  bulk stable-ID actions, Reporting Group reverse membership and inherited/
+  custom/excluded/Identity Pending visibility without changing mapping
+  authority semantics.
+- Generalized weekly cache, publication and Performance runtime for a dynamic
+  positive number of active Reporting Groups while preserving the accepted
+  nine-group state and legacy nine-group regression evidence.
+- Added Settings administration for safe creation of one stable active
+  Reporting Group. New groups create no Mapping Rule, default to No in future
+  Performance selection and truthfully require cache refresh.
+- Hardened failure recovery with one prior full rollback cache, idempotent
+  Candidate/publication writes, restore-on-activation-failure guards, stale
+  authority rejection and no-archive behavior for unsafe outcomes.
+- Added the release-state operations runbook, production Office Scripts
+  inventory and explicit Power Automate serialization/retry contract.
+- Recorded a known lineage exception: the controlled W33 Published ledger row
+  has no proven original OneDrive SourceLocator. Its content and cache lineage
+  remain complete; later identical-content locators are not backfilled as
+  historical fact.
+
 ### Implemented in Phase 1 foundation
 
 - Added a rerunnable Phase 1 Office Script for the validated 0.2.0-QA checkpoint.
