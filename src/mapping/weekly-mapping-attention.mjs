@@ -205,6 +205,109 @@ export function buildWeeklyMappingAttentionProjection({
   };
 }
 
+/**
+ * Build the read-only reverse membership view used by Mapping administration.
+ * The weekly attention rows already contain the accepted resolver outcome; this
+ * function only filters and aggregates that authority by active ReportingGroupID.
+ */
+export function buildReportingGroupMembershipView({
+  rows,
+  reportingGroups,
+  memberCapacity = 400,
+}) {
+  requireArray(rows, "rows");
+  requireArray(reportingGroups, "reportingGroups");
+  const activeGroups = reportingGroups
+    .filter(group => String(group.active ?? "Yes") === "Yes")
+    .map(group => ({
+      reportingGroupId: requiredText(group.reportingGroupId, "ReportingGroupID"),
+      reportingGroupName: requiredText(group.reportingGroupName, "ReportingGroupName"),
+      sortOrder: Number(group.sortOrder ?? 0),
+    }))
+    .sort((left, right) => left.sortOrder - right.sortOrder ||
+      compareText(left.reportingGroupName, right.reportingGroupName));
+  const groupById = uniqueIndex(
+    activeGroups,
+    group => group.reportingGroupId,
+    "active ReportingGroupID",
+  );
+  uniqueIndex(
+    activeGroups,
+    group => group.reportingGroupName,
+    "active ReportingGroupName",
+  );
+  const overviewById = new Map(activeGroups.map(group => [group.reportingGroupId, {
+    ...group,
+    productCount: 0,
+    factCount: 0,
+    salesNok: 0,
+  }]));
+  const productIds = new Set();
+  const members = [];
+  for (const row of rows) {
+    if (String(row.mappingStatus ?? "") !== "Mapped") continue;
+    const productId = requiredText(row.productId, "mapped ProductID");
+    if (productIds.has(productId)) {
+      fail("PUL-030RG-001", `Mapped ProductID ${productId} is duplicated.`);
+    }
+    productIds.add(productId);
+    const reportingGroupId = requiredText(
+      row.effectiveReportingGroupId,
+      `mapped Product ${productId} ReportingGroupID`,
+    );
+    const group = groupById.get(reportingGroupId);
+    if (!group) {
+      fail("PUL-030RG-002", `Mapped Product ${productId} targets inactive or unknown ${reportingGroupId}.`);
+    }
+    const resolutionType = requiredText(row.resolutionType, `mapped Product ${productId} resolution`);
+    if (!["Explicit Product", "Inherited Subcategory", "Inherited Main"].includes(resolutionType)) {
+      fail("PUL-030RG-003", `Mapped Product ${productId} has unsupported resolution ${resolutionType}.`);
+    }
+    const member = {
+      productId,
+      product: String(row.item ?? ""),
+      mainCategory: String(row.sourceMainCategory ?? ""),
+      subcategory: String(row.sourceSubCategory ?? ""),
+      salesAccount: String(row.salesAccount ?? ""),
+      reportingGroupId,
+      reportingGroupName: group.reportingGroupName,
+      mappingState: resolutionType === "Explicit Product" ? "Custom" : "Inherited",
+      factCount: Number(row.historicalFactCount ?? 0),
+      salesNok: round(Number(row.historicalSalesNok ?? 0), 2),
+    };
+    members.push(member);
+    const overview = overviewById.get(reportingGroupId);
+    overview.productCount += 1;
+    overview.factCount += member.factCount;
+    overview.salesNok += member.salesNok;
+  }
+  members.sort((left, right) => {
+    const groupCompare = activeGroups.findIndex(group => group.reportingGroupId === left.reportingGroupId) -
+      activeGroups.findIndex(group => group.reportingGroupId === right.reportingGroupId);
+    return groupCompare || compareText(left.product, right.product) ||
+      compareText(left.salesAccount, right.salesAccount) || compareText(left.productId, right.productId);
+  });
+  const overview = activeGroups.map(group => {
+    const value = overviewById.get(group.reportingGroupId);
+    return { ...value, salesNok: round(value.salesNok, 2) };
+  });
+  const maximumGroupProducts = overview.reduce((maximum, row) =>
+    Math.max(maximum, row.productCount), 0);
+  if (maximumGroupProducts > memberCapacity) {
+    fail(
+      "PUL-030RG-004",
+      `Largest Reporting Group has ${maximumGroupProducts} Products; bounded capacity is ${memberCapacity}.`,
+    );
+  }
+  const totals = overview.reduce((result, row) => ({
+    productCount: result.productCount + row.productCount,
+    factCount: result.factCount + row.factCount,
+    salesNok: result.salesNok + row.salesNok,
+  }), { productCount: 0, factCount: 0, salesNok: 0 });
+  totals.salesNok = round(totals.salesNok, 2);
+  return { activeGroups, overview, members, totals, maximumGroupProducts };
+}
+
 function hierarchyAttention(product, review) {
   const observed = [...(product.observedHierarchyPaths ?? [])].sort(compareText);
   if (String(product.hierarchyStatus ?? "") === "Identity Pending") {

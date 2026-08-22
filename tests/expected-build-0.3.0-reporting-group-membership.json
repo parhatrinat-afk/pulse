@@ -1,0 +1,17 @@
+{
+  "source": "accepted 85-week Weekly Mapping Attention projection",
+  "reportingGroups": [
+    { "reportingGroupId": "RPG-0001", "reportingGroupName": "Add-ons", "products": 127, "facts": 22734, "salesNok": 5132188.00, "custom": 2, "inherited": 125 },
+    { "reportingGroupId": "RPG-0002", "reportingGroupName": "Non-Alcohol", "products": 60, "facts": 22638, "salesNok": 24014761.70, "custom": 6, "inherited": 54 },
+    { "reportingGroupId": "RPG-0003", "reportingGroupName": "Spirits/Cocktails", "products": 142, "facts": 26981, "salesNok": 20061907.50, "custom": 4, "inherited": 138 },
+    { "reportingGroupId": "RPG-0004", "reportingGroupName": "Coffee & Tea", "products": 48, "facts": 14106, "salesNok": 5331748.23, "custom": 1, "inherited": 47 },
+    { "reportingGroupId": "RPG-0005", "reportingGroupName": "Beer & Cider", "products": 26, "facts": 10140, "salesNok": 35678692.83, "custom": 7, "inherited": 19 },
+    { "reportingGroupId": "RPG-0006", "reportingGroupName": "Desserts", "products": 20, "facts": 9286, "salesNok": 21756308.00, "custom": 1, "inherited": 19 },
+    { "reportingGroupId": "RPG-0007", "reportingGroupName": "Wine & Sake", "products": 95, "facts": 22218, "salesNok": 44463325.26, "custom": 10, "inherited": 85 },
+    { "reportingGroupId": "RPG-0008", "reportingGroupName": "Starters", "products": 59, "facts": 12535, "salesNok": 26226192.60, "custom": 3, "inherited": 56 },
+    { "reportingGroupId": "RPG-0009", "reportingGroupName": "Mains", "products": 352, "facts": 88552, "salesNok": 296984760.98, "custom": 15, "inherited": 337 }
+  ],
+  "totals": { "products": 929, "facts": 229190, "salesNok": 479649885.10 },
+  "nonAlcohol": { "products": 60, "facts": 22638, "salesNok": 24014761.70 },
+  "mains": { "products": 352, "facts": 88552, "salesNok": 296984760.98 }
+}

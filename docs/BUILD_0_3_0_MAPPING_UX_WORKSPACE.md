@@ -10,12 +10,11 @@ Weekly Mapping Attention projection.
 `Mapping` presents:
 
 1. weekly Mapping health and Performance-classification freshness;
-2. `Show category` and `View` controls;
-3. an intentional bulk-action area;
-4. a read-only Main Category overview with current category rule, hierarchy
-   size, 85-week impact and attention;
-5. one bounded member workspace containing the shown category's Subcategories
-   and Products.
+2. a `Browse by` control for `Source Category` or read-only `Reporting Group` validation;
+3. the relevant business-name selector and a compact selected-context summary;
+4. one shared member workspace near the top of the sheet;
+5. an intentional bulk-action area in Source Category mode; and
+6. secondary 93-category and nine-group overview tables below the working area.
 
 The stable-ID catalogs and the authoritative Main/Subcategory/Product audit
 tables remain available on hidden `_Mapping_Audit`. Their table names and data
@@ -26,11 +25,35 @@ The Main Category overview is navigation, not a bulk-selection table. Mapping
 an entire Main Category requires choosing `Entire shown category` in the
 separate `Apply to` control.
 
-The member workspace shows business names, current Reporting Group,
+The shared member workspace shows business names, current Reporting Group,
 `Inherited`, `Custom`, `Unmapped`, `Excluded`, `Identity Pending`, `Conflict`
 or `Inactive Target`, plus historical Facts/Sales and attention. Stable IDs,
 rule lineage and Historical Quantity remain in hidden columns and retained
 engineering tables.
+
+The health area is a compact set of Mapped, Unmapped, Identity Pending,
+Conflict and Inactive Target cards showing exact Product, Fact and Sales
+impact. It contains no cache IDs or fingerprints.
+
+## Reporting Group validation
+
+`Browse by = Reporting Group` exposes a business-name selector for the nine
+active Reporting Groups. The shared member workspace becomes read-only and shows Product, source
+Main Category, Subcategory, Sales Account, inherited/custom state and 85-week
+Facts/Sales. It is a formula-driven façade over a hidden one-row-per-Product
+catalog on `_Mapping_Audit`; ProductID and ReportingGroupID remain backstage.
+
+Only Products whose current accepted resolver status is `Mapped` appear.
+Unmapped, explicit exclusions, Identity Pending, Conflict and Inactive Target
+remain visible in Mapping health and Source Category attention but are not
+members of an active Reporting Group. The nine-row overview reconciles unique
+Product membership to the mapped weekly population without inferring from POS
+names or categories.
+
+Reporting Group membership is intentionally read-only in this slice. Mapping
+changes still use the established Source Category selection and atomic bulk
+action. Attempting to submit an action while browsing by Reporting Group fails
+before any rule write.
 
 ## Category and member interaction
 
@@ -39,16 +62,32 @@ to `All`, `Unmapped`, `Custom`, `Identity Pending` or `Excluded`. These controls
 recalculate through same-sheet Excel formulas; no Office Script rerun is
 required merely to browse.
 
-The visible member range is a fixed 150-row Excel Table over a hidden,
-deterministically sorted member catalog on `_Mapping_Audit`. Only its `Select`
-cells are editable.
-This avoids an editable dynamic-spill range while supporting the current
-largest category (119 members) with a bounded capacity check.
+The visible member range is one fixed 400-row Excel Table over hidden,
+deterministically sorted catalogs on `_Mapping_Audit`. Source Category mode
+uses its accepted 150-row selectable bound and Reporting Group mode uses the
+same physical area with a 400-row read-only bound. This avoids editable dynamic
+spill ranges, keeps the two browse modes visually coherent, and supports the
+current largest category (119 hierarchy members) and Reporting Group (352
+Products) with explicit capacity checks.
 
-After any member is selected, the Category and View validation sources collapse
-to their current values. This prevents normal Excel-for-web dropdown use from
-rebinding selected rows to different stable IDs. Apply or clear the selection
-before changing category or view.
+The member `Select` dropdown offers `Yes` and `No`; blank remains a valid
+unselected value for preserved workbook state. `No` makes individual
+deselection explicit without changing stable-ID selection or batch semantics.
+
+After any member is selected, Browse by, Category and View validation sources
+collapse to their current values. This prevents normal Excel-for-web dropdown
+use from rebinding selected rows to different stable IDs. Apply or clear the
+selection before changing browse mode, category or view.
+
+Successful dropdown wiring remains backstage and does not display a QA/debug
+readiness banner on the user-facing Mapping workspace.
+
+The upper Mapping workspace uses a compact fixed geometry at 100% zoom. Control
+values, short states and impact measures are centered; identity and explanatory
+text stays left-aligned. The Action and Assign-to controls retain enough width
+for every approved option without consuming the free-text space reserved for
+Notes. Mapping health cards keep each state adjacent to its Product, Fact and
+Sales values.
 
 ## Atomic bulk actions
 
@@ -59,6 +98,16 @@ The visible actions are:
 - `Leave Unmapped` — creates the established Product-only explicit exclusion;
 - `Remove custom mapping` — deactivates the explicit rule at each selected node
   so normal parent inheritance resumes.
+
+The merged Action and Assign-to controls use same-sheet range-backed dropdown
+sources so Excel for the web can resolve them after the final Mapping geometry
+is applied. Action choices recalculate from the current stable-ID selection:
+assignment is offered for a safe batch, `Leave Unmapped` only for selected
+Products, and `Remove custom mapping` only when every requested node has an
+explicit active rule (or the intentionally selected whole category does).
+Assign-to exposes the nine active Reporting Group business names only when
+assignment is the selected action. Reporting Group browse mode and Identity
+Pending members remain read-only.
 
 The user can apply an action to selected members or intentionally to the entire
 shown Main Category. A broad parent change never deletes or overwrites lower

@@ -60,8 +60,8 @@ test("only Select is editable while stable IDs stay backstage", async () => {
   assert.match(script, /const memberHeaders = \["Select", "Level", "Item", "Subcategory", "Sales Account", "Reporting Group", "Mapping state"/);
   assert.match(script, /"SourceSystemID", "ScopeType", "NodeID", "ProductID"/);
   assert.match(script, /sheet\.getRange\("K:U"\)\.setColumnHidden\(true\)/);
-  assert.match(script, /sheet\.getRange\("K:AT"\)\.setColumnHidden\(true\)/);
-  assert.match(script, /getColumn\("Select"\).*\["Yes"\]/s);
+  assert.match(script, /sheet\.getRange\("K:AU"\)\.setColumnHidden\(true\)/);
+  assert.match(script, /applyLiteralValidation\(sheet\.getRange\("A23:A172"\), \["Yes", "No"\]/);
 });
 
 test("member selections lock category and view to prevent stable-ID drift", async () => {

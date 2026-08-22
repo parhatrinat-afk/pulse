@@ -98,6 +98,7 @@ type MappingSelectionTarget = {
   mappingState: string;
 };
 type MappingWorkspaceState = {
+  browseBy: string; reportingGroupName: string;
   view: string; categoryChoice: string; applyTo: string;
   intent: string; targetGroupName: string; notes: string;
   selectedTargets: MappingSelectionTarget[];
@@ -189,6 +190,9 @@ function applyPendingAction(
 ): string {
   const intent = state.intent;
   if (!intent) return "No pending mapping action.";
+  if (state.browseBy !== "Source Category") {
+    throw new Error("PUL-0301-029: Reporting Group membership is read-only. Return to Source Category before changing mappings.");
+  }
   const allowed = ["Assign Reporting Group", "Leave Unmapped", "Remove custom mapping"];
   if (allowed.indexOf(intent) < 0) throw new Error(`PUL-0301-012: Unsupported Mapping action ${intent}.`);
   const selected = state.selectedTargets;
@@ -348,13 +352,16 @@ function readMappingWorkspaceState(workbook: ExcelScript.Workbook, sheet: ExcelS
       break;
     }
   }
-  return { view: text(sheet.getRange("E12").getValue()) || "All", categoryChoice, applyTo,
+  return { browseBy: text(sheet.getRange("B10").getValue()) || "Source Category",
+    reportingGroupName: text(sheet.getRange("E10").getValue()),
+    view: text(sheet.getRange("E12").getValue()) || "All", categoryChoice, applyTo,
     intent: text(sheet.getRange("B15").getValue()), targetGroupName: text(sheet.getRange("E15").getValue()),
     notes: text(sheet.getRange("H15").getValue()), selectedTargets };
 }
 
 function emptyWorkspaceState(): MappingWorkspaceState {
-  return { view: "All", categoryChoice: "", applyTo: "Selected members", intent: "",
+  return { browseBy: "Source Category", reportingGroupName: "", view: "All", categoryChoice: "",
+    applyTo: "Selected members", intent: "",
     targetGroupName: "", notes: "", selectedTargets: [] };
 }
 
@@ -548,10 +555,20 @@ type MappingWorkspaceCategory = {
   facts: number; sales: number; attention: string; sourceSystemId: string; mainNodeId: string;
   categoryChoice: string; currentExplicitRuleId: string; currentRuleAction: string; currentTargetId: string;
 };
+type MappingReportingGroupMember = {
+  product: string; mainCategory: string; subcategory: string; salesAccount: string;
+  mappingState: string; facts: number; sales: number; productId: string;
+  reportingGroupId: string; reportingGroupName: string;
+};
+type MappingReportingGroupOverview = {
+  reportingGroupId: string; reportingGroupName: string; products: number; facts: number; sales: number;
+};
 
 function buildMappingWorkspaceData(
   attention: ExcelScript.Table, groups: ReportingGroup[], rules: MappingRule[]
-): { categories: MappingWorkspaceCategory[]; members: MappingWorkspaceMember[] } {
+): { categories: MappingWorkspaceCategory[]; members: MappingWorkspaceMember[];
+  reportingGroupOverview: MappingReportingGroupOverview[];
+  reportingGroupMembers: MappingReportingGroupMember[] } {
   const h = headerMap(attention);
   const rows = attention.getRangeBetweenHeaderAndTotal().getValues();
   const asOf = excelToday();
@@ -752,7 +769,51 @@ function buildMappingWorkspaceData(
     (left.level === right.level ? 0 : left.level === "Subcategory" ? -1 : 1) ||
     left.subcategory.localeCompare(right.subcategory) || left.item.localeCompare(right.item) ||
     left.nodeId.localeCompare(right.nodeId));
-  return { categories: categoryRows, members: memberRows };
+  const activeGroups = groups.filter(group => group.active === "Yes")
+    .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name));
+  const groupOrder: { [key: string]: number } = {};
+  const activeGroupNames: { [key: string]: boolean } = {};
+  const reportingGroupOverview: MappingReportingGroupOverview[] = [];
+  const reportingGroupOverviewById: { [key: string]: MappingReportingGroupOverview } = {};
+  for (let index = 0; index < activeGroups.length; index += 1) {
+    const group = activeGroups[index];
+    if (activeGroupNames[group.name]) {
+      throw new Error(`PUL-0301-033: Active Reporting Group name is duplicated: ${group.name}.`);
+    }
+    activeGroupNames[group.name] = true;
+    groupOrder[group.id] = index;
+    const overview = { reportingGroupId: group.id, reportingGroupName: group.name, products: 0, facts: 0, sales: 0 };
+    reportingGroupOverview.push(overview);
+    reportingGroupOverviewById[group.id] = overview;
+  }
+  const reportingGroupMembers: MappingReportingGroupMember[] = [];
+  const seenMappedProductIds: { [key: string]: boolean } = {};
+  for (let index = 0; index < products.length; index += 1) {
+    const product = products[index];
+    if (product.resolution.resolutionStatus !== "Mapped") continue;
+    const reportingGroupId = product.resolution.effectiveGroupId;
+    const overview = reportingGroupOverviewById[reportingGroupId];
+    if (!overview) {
+      throw new Error(`PUL-0301-030: Mapped Product ${product.productId} targets inactive or unknown ${reportingGroupId}.`);
+    }
+    if (seenMappedProductIds[product.productId]) {
+      throw new Error(`PUL-0301-031: Mapped ProductID is duplicated in Reporting Group membership: ${product.productId}.`);
+    }
+    seenMappedProductIds[product.productId] = true;
+    const mappingState = product.resolution.resolutionSource === "Product" ? "Custom" : "Inherited";
+    reportingGroupMembers.push({
+      product: product.item, mainCategory: product.mainCategory || "(No approved Main Category)",
+      subcategory: product.subcategory || "(No approved Subcategory)", salesAccount: product.salesAccount,
+      mappingState, facts: product.facts, sales: product.sales, productId: product.productId,
+      reportingGroupId, reportingGroupName: overview.reportingGroupName
+    });
+    overview.products += 1; overview.facts += product.facts; overview.sales += product.sales;
+  }
+  reportingGroupMembers.sort((left, right) =>
+    (groupOrder[left.reportingGroupId] - groupOrder[right.reportingGroupId]) ||
+    left.product.localeCompare(right.product) || left.salesAccount.localeCompare(right.salesAccount) ||
+    left.productId.localeCompare(right.productId));
+  return { categories: categoryRows, members: memberRows, reportingGroupOverview, reportingGroupMembers };
 }
 
 function writeMappingSurface(
@@ -763,6 +824,7 @@ function writeMappingSurface(
   const attention = requiredTable(workbook, "tblWeeklyMappingAttention");
   const workspace = buildMappingWorkspaceData(attention, groups, rules);
   const memberCapacity = 150;
+  const reportingGroupMemberCapacity = 400;
   let maximumMembers = 0;
   for (let categoryIndex = 0; categoryIndex < workspace.categories.length; categoryIndex += 1) {
     const choice = workspace.categories[categoryIndex].categoryChoice;
@@ -772,16 +834,26 @@ function writeMappingSurface(
   if (maximumMembers > memberCapacity) {
     throw new Error(`PUL-0301-028: The largest category has ${maximumMembers} members; the safe workspace capacity is ${memberCapacity}.`);
   }
+  let maximumReportingGroupMembers = 0;
+  for (let groupIndex = 0; groupIndex < workspace.reportingGroupOverview.length; groupIndex += 1) {
+    maximumReportingGroupMembers = Math.max(maximumReportingGroupMembers,
+      workspace.reportingGroupOverview[groupIndex].products);
+  }
+  if (maximumReportingGroupMembers > reportingGroupMemberCapacity) {
+    throw new Error(`PUL-0301-032: The largest Reporting Group has ${maximumReportingGroupMembers} Products; the safe membership capacity is ${reportingGroupMemberCapacity}.`);
+  }
   const sheet = resetOutputSheet(workbook, "Mapping", "tblMappingMainNodes", "tblMappingSubcategoryNodes",
     "tblMappingProducts", "tblMappingUXControl", "tblMappingCategoryOverview", "tblMappingCategoryCatalog",
-    "tblMappingMemberWorkspace", "tblMappingMemberCatalog");
+    "tblMappingMemberWorkspace", "tblMappingMemberCatalog", "tblMappingReportingGroupOverview",
+    "tblMappingReportingGroupMembers", "tblMappingReportingGroupCatalog");
   const auditSheet = resetOutputSheet(workbook, "_Mapping_Audit", "tblMappingMainNodes", "tblMappingSubcategoryNodes",
-    "tblMappingProducts", "tblMappingCategoryCatalog", "tblMappingMemberCatalog");
+    "tblMappingProducts", "tblMappingCategoryCatalog", "tblMappingMemberCatalog",
+    "tblMappingReportingGroupCatalog");
   auditSheet.setVisibility(ExcelScript.SheetVisibility.hidden);
   sheet.getRange("A1:N18").unmerge();
-  writeTitle(sheet, "Mapping", "Browse source categories, inspect their members, and apply one validated mapping decision to one or many stable hierarchy items.", "N");
+  writeTitle(sheet, "Mapping", "Browse source categories for controlled mapping changes or validate current effective Product membership by Reporting Group.", "N");
 
-  sheet.getRange("A4:N4").setValues([["Weekly mapping health", "", "", "", "", "", "", "", "", "", "", "", "", ""]]);
+  sheet.getRange("A4:N4").setValues([["Mapping health", "", "", "", "", "", "", "", "", "", "", "", "", ""]]);
   styleNavyHeader(sheet.getRange("A4:N4"));
   sheet.getRange("A5:F8").getFormat().getFill().setColor("#FFFFFF");
   sheet.getRange("A9:N9").getFormat().getFill().setColor("#E2F0D9");
@@ -792,6 +864,21 @@ function writeMappingSurface(
   const views = ["All", "Unmapped", "Custom", "Identity Pending", "Excluded"];
   const defaultView = views.indexOf(priorState.view) >= 0 ? priorState.view : "All";
   const applyTo = priorState.applyTo === "Entire shown category" ? priorState.applyTo : "Selected members";
+  const browseModes = ["Source Category", "Reporting Group"];
+  const browseBy = browseModes.indexOf(priorState.browseBy) >= 0 ? priorState.browseBy : "Source Category";
+  const reportingGroupNames = workspace.reportingGroupOverview.map(group => group.reportingGroupName);
+  const reportingGroupName = reportingGroupNames.indexOf(priorState.reportingGroupName) >= 0
+    ? priorState.reportingGroupName : reportingGroupNames[0] || "";
+
+  sheet.getRange("A10").setValue("Browse by"); sheet.getRange("B10").setValue(browseBy);
+  sheet.getRange("D10").setValue("Reporting Group"); sheet.getRange("E10").setValue(reportingGroupName);
+  sheet.getRange("G10:J10").merge();
+  sheet.getRange("G10").setFormula('=IF($B$10="Reporting Group","Read-only membership below · "&$E$10,"Source Category mapping mode")');
+  sheet.getRange("A10").getFormat().getFont().setBold(true);
+  sheet.getRange("D10").getFormat().getFont().setBold(true);
+  styleInput(sheet.getRange("B10")); styleInput(sheet.getRange("E10"));
+  sheet.getRange("G10:J10").getFormat().getFill().setColor("#EAF2FF");
+  sheet.getRange("G10:J10").getFormat().getFont().setBold(true);
 
   sheet.getRange("A11:N11").setValues([["Category and bulk mapping", "", "", "", "", "", "", "", "", "", "", "", "", ""]]);
   styleSectionHeader(sheet.getRange("A11:N11"));
@@ -809,7 +896,7 @@ function writeMappingSurface(
   sheet.getRange("I12:I13").getFormat().getFont().setBold(true);
   styleInput(sheet.getRange("B12")); styleInput(sheet.getRange("E12")); styleInput(sheet.getRange("B13"));
   sheet.getRange("A14:N14").merge();
-  sheet.getRange("A14").setValue("Select one or more members below, choose an action, and apply once. Category and View lock while selected. Use Entire shown category only for an intentional category-wide rule.");
+  sheet.getRange("A14").setValue("Use Select = Yes or No. Select one or more members, choose an action, and apply once. Use Entire shown category only for an intentional category-wide rule.");
   sheet.getRange("A14:N14").getFormat().getFill().setColor("#EAF2FF"); sheet.getRange("A14:N14").getFormat().setWrapText(true);
   sheet.getRange("A15").setValue("Action"); sheet.getRange("B15").setValue(priorState.intent);
   sheet.getRange("D15").setValue("Assign to"); sheet.getRange("E15").setValue(priorState.targetGroupName);
@@ -820,7 +907,8 @@ function writeMappingSurface(
   styleInput(sheet.getRange("B15")); styleInput(sheet.getRange("E15")); styleInput(sheet.getRange("H15:J16"));
   sheet.getRange("A17:J17").merge(); sheet.getRange("A17").setValue(message);
   sheet.getRange("A17:J17").getFormat().getFill().setColor("#F7F9FC"); sheet.getRange("A17:J17").getFormat().setWrapText(true);
-  sheet.getRange("A18:J18").merge(); sheet.getRange("A18").setValue("Validation wiring pending.");
+  sheet.getRange("A18:J18").merge(); sheet.getRange("A18").setValue("");
+  sheet.getRange("18:18").getFormat().setRowHeight(6);
 
   sheet.getRange("A19:N19").setValues([["Category overview — navigation and impact", "", "", "", "", "", "", "", "", "", "", "", "", ""]]);
   styleSectionHeader(sheet.getRange("A19:N19"));
@@ -923,9 +1011,97 @@ function writeMappingSurface(
   selectFormat.getCustom().getRule().setFormula(`=$B${memberBodyStartRow}<>""`);
   selectFormat.getCustom().getFormat().getFill().setColor("#FFF4CE");
 
+  const reportingGroupOverviewSectionRow = memberBodyEndRow + 3;
+  const reportingGroupOverviewHeaderRow = reportingGroupOverviewSectionRow + 1;
+  const reportingGroupOverviewStartRow = reportingGroupOverviewHeaderRow + 1;
+  const reportingGroupOverviewEndRow = reportingGroupOverviewHeaderRow + workspace.reportingGroupOverview.length;
+  sheet.getRange(`A${reportingGroupOverviewSectionRow}:J${reportingGroupOverviewSectionRow}`).merge();
+  sheet.getRange(`A${reportingGroupOverviewSectionRow}`).setValue("Reporting Group overview — current effective Product membership");
+  styleSectionHeader(sheet.getRange(`A${reportingGroupOverviewSectionRow}:J${reportingGroupOverviewSectionRow}`));
+  sheet.getRange(`C${reportingGroupOverviewHeaderRow}:F${reportingGroupOverviewHeaderRow}`)
+    .setValues([["Reporting Group", "Products", "Facts", "Sales NOK"]]);
+  const reportingGroupOverviewValues = workspace.reportingGroupOverview.map(group => [
+    group.reportingGroupName, group.products, group.facts, group.sales
+  ]);
+  if (reportingGroupOverviewValues.length) {
+    sheet.getRangeByIndexes(reportingGroupOverviewStartRow - 1, 2,
+      reportingGroupOverviewValues.length, 4).setValues(reportingGroupOverviewValues);
+  }
+  const reportingGroupOverviewTable = sheet.addTable(
+    `C${reportingGroupOverviewHeaderRow}:F${Math.max(reportingGroupOverviewHeaderRow, reportingGroupOverviewEndRow)}`, true);
+  reportingGroupOverviewTable.setName("tblMappingReportingGroupOverview");
+  reportingGroupOverviewTable.setPredefinedTableStyle("TableStyleMedium2");
+  if (reportingGroupOverviewValues.length) {
+    sheet.getRange(`D${reportingGroupOverviewStartRow}:E${reportingGroupOverviewEndRow}`).setNumberFormat("#,##0");
+    sheet.getRange(`F${reportingGroupOverviewStartRow}:F${reportingGroupOverviewEndRow}`).setNumberFormat("#,##0.00");
+  }
+
+  const reportingGroupMemberSectionRow = reportingGroupOverviewEndRow + 3;
+  const reportingGroupMemberHeaderRow = reportingGroupMemberSectionRow + 1;
+  const reportingGroupMemberBodyStartRow = reportingGroupMemberHeaderRow + 1;
+  const reportingGroupMemberBodyEndRow = reportingGroupMemberHeaderRow + reportingGroupMemberCapacity;
+  sheet.getRange(`A${reportingGroupMemberSectionRow}:J${reportingGroupMemberSectionRow}`).merge();
+  sheet.getRange(`A${reportingGroupMemberSectionRow}`)
+    .setFormula('=IF($B$10="Reporting Group","Products in "&$E$10,"Reporting Group membership — choose Reporting Group above")');
+  styleSectionHeader(sheet.getRange(`A${reportingGroupMemberSectionRow}:J${reportingGroupMemberSectionRow}`));
+  const reportingGroupMemberHeaders = ["Product", "Main Category", "Subcategory", "Sales Account",
+    "Mapping state", "Facts", "Sales NOK"];
+  sheet.getRange(`C${reportingGroupMemberHeaderRow}:I${reportingGroupMemberHeaderRow}`)
+    .setValues([reportingGroupMemberHeaders]);
+  const reportingGroupMemberTable = sheet.addTable(
+    `C${reportingGroupMemberHeaderRow}:I${reportingGroupMemberBodyEndRow}`, true);
+  reportingGroupMemberTable.setName("tblMappingReportingGroupMembers");
+  reportingGroupMemberTable.setPredefinedTableStyle("TableStyleLight9");
+  reportingGroupMemberTable.setShowBandedRows(false);
+
+  const reportingGroupCatalogHeaders = ["Product", "Main Category", "Subcategory", "Sales Account",
+    "Mapping state", "Facts", "Sales NOK", "ProductID", "Reporting Group", "ReportingGroupID"];
+  auditSheet.getRange("BU1:CD1").setValues([reportingGroupCatalogHeaders]);
+  const reportingGroupCatalogValues = workspace.reportingGroupMembers.map(member => [
+    member.product, member.mainCategory, member.subcategory, member.salesAccount, member.mappingState,
+    member.facts, member.sales, member.productId, member.reportingGroupName, member.reportingGroupId
+  ]);
+  if (reportingGroupCatalogValues.length) {
+    auditSheet.getRangeByIndexes(1, 72, reportingGroupCatalogValues.length,
+      reportingGroupCatalogHeaders.length).setValues(reportingGroupCatalogValues);
+  }
+  const reportingGroupCatalogEndRow = Math.max(1, reportingGroupCatalogValues.length + 1);
+  const reportingGroupCatalogTable = auditSheet.addTable(`BU1:CD${reportingGroupCatalogEndRow}`, true);
+  reportingGroupCatalogTable.setName("tblMappingReportingGroupCatalog");
+  reportingGroupCatalogTable.setPredefinedTableStyle("TableStyleLight1");
+
+  sheet.getRange("AU1").setValue("Reporting Group catalog row index");
+  const reportingGroupIndexFormulas: string[][] = [];
+  for (let rowIndex = 0; rowIndex < reportingGroupMemberCapacity; rowIndex += 1) {
+    reportingGroupIndexFormulas.push([
+      `=IF($B$10<>"Reporting Group","",IFERROR(AGGREGATE(15,6,(ROW('_Mapping_Audit'!$BU$2:$BU$${reportingGroupCatalogEndRow})-ROW('_Mapping_Audit'!$BU$2)+1)/('_Mapping_Audit'!$CC$2:$CC$${reportingGroupCatalogEndRow}=$E$10),ROWS($AU$2:AU${rowIndex + 2})),""))`
+    ]);
+  }
+  sheet.getRange(`AU2:AU${reportingGroupMemberCapacity + 1}`).setFormulas(reportingGroupIndexFormulas);
+  const reportingGroupMemberFormulas: string[][] = [];
+  const reportingGroupCatalogColumns = ["BU", "BV", "BW", "BX", "BY", "BZ", "CA"];
+  const numericReportingGroupColumns: { [key: string]: boolean } = { "BZ": true, "CA": true };
+  for (let rowIndex = 0; rowIndex < reportingGroupMemberCapacity; rowIndex += 1) {
+    const formulaRow: string[] = [];
+    for (let columnIndex = 0; columnIndex < reportingGroupCatalogColumns.length; columnIndex += 1) {
+      const sourceColumn = reportingGroupCatalogColumns[columnIndex];
+      const indexedValue = `INDEX('_Mapping_Audit'!$${sourceColumn}$2:$${sourceColumn}$${reportingGroupCatalogEndRow},$AU${rowIndex + 2})`;
+      formulaRow.push(numericReportingGroupColumns[sourceColumn]
+        ? `=IF($AU${rowIndex + 2}="","",IFERROR(${indexedValue},""))`
+        : `=IF($AU${rowIndex + 2}="","",IFERROR(${indexedValue}&"",""))`);
+    }
+    reportingGroupMemberFormulas.push(formulaRow);
+  }
+  sheet.getRange(`C${reportingGroupMemberBodyStartRow}:I${reportingGroupMemberBodyEndRow}`)
+    .setFormulas(reportingGroupMemberFormulas);
+  sheet.getRange(`H${reportingGroupMemberBodyStartRow}:H${reportingGroupMemberBodyEndRow}`)
+    .setNumberFormat("#,##0");
+  sheet.getRange(`I${reportingGroupMemberBodyStartRow}:I${reportingGroupMemberBodyEndRow}`)
+    .setNumberFormat("#,##0.00");
+
   workbook.getApplication().calculate(ExcelScript.CalculationType.full);
   sheet.getRange("K:U").setColumnHidden(true);
-  sheet.getRange("K:AT").setColumnHidden(true);
+  sheet.getRange("K:AU").setColumnHidden(true);
 
   const resultByProduct = new Map<string, Resolution>(); for (const row of resolved) resultByProduct.set(row.productId, row);
   const main = new Map<string, { source: string; name: string; products: Set<string>; subs: Set<string>; ruleIds: Set<string>; targetIds: Set<string>; inherited: number; sales: number; qty: number; exceptions: number }>();
@@ -994,12 +1170,17 @@ function writeMappingSurface(
   setWidths(sheet,[105,130,175,115,145,125,105,105,105,170,70,70,70,70]);
   sheet.getRange("1:1").getFormat().setRowHeight(32); sheet.getRange("2:2").getFormat().setRowHeight(32);
   sheet.getRange("4:4").getFormat().setRowHeight(26); sheet.getRange("5:9").getFormat().setRowHeight(22);
+  sheet.getRange("10:10").getFormat().setRowHeight(28);
   sheet.getRange("11:11").getFormat().setRowHeight(26); sheet.getRange("12:13").getFormat().setRowHeight(28);
-  sheet.getRange("14:14").getFormat().setRowHeight(30); sheet.getRange("15:16").getFormat().setRowHeight(28);
+  sheet.getRange("14:14").getFormat().setRowHeight(42); sheet.getRange("15:16").getFormat().setRowHeight(28);
   sheet.getRange("17:18").getFormat().setRowHeight(26); sheet.getRange("19:20").getFormat().setRowHeight(28);
   sheet.getRange(`21:${categoryEndRow}`).getFormat().setRowHeight(30);
   sheet.getRange(`${memberSectionRow}:${memberHeaderRow}`).getFormat().setRowHeight(28);
   sheet.getRange(`${memberBodyStartRow}:${memberBodyEndRow}`).getFormat().setRowHeight(24);
+  sheet.getRange(`${reportingGroupOverviewSectionRow}:${reportingGroupOverviewHeaderRow}`).getFormat().setRowHeight(28);
+  sheet.getRange(`${reportingGroupOverviewStartRow}:${reportingGroupOverviewEndRow}`).getFormat().setRowHeight(24);
+  sheet.getRange(`${reportingGroupMemberSectionRow}:${reportingGroupMemberHeaderRow}`).getFormat().setRowHeight(28);
+  sheet.getRange(`${reportingGroupMemberBodyStartRow}:${reportingGroupMemberBodyEndRow}`).getFormat().setRowHeight(24);
   sheet.getRange(`A11:J${memberBodyEndRow}`).getFormat().setVerticalAlignment(ExcelScript.VerticalAlignment.center);
   sheet.getRange(`A11:J${memberBodyEndRow}`).getFormat().setWrapText(false);
   sheet.getRange("A14:N14").getFormat().setWrapText(true);
@@ -1009,9 +1190,308 @@ function writeMappingSurface(
   sheet.getRange(`H21:H${categoryEndRow}`).getFormat().setWrapText(true);
   sheet.getRange(`A${memberHeaderRow}:J${memberHeaderRow}`).getFormat().setWrapText(true);
   sheet.getRange(`J${memberBodyStartRow}:J${memberBodyEndRow}`).getFormat().setWrapText(true);
+  sheet.getRange(`C${reportingGroupOverviewHeaderRow}:F${reportingGroupOverviewHeaderRow}`).getFormat().setWrapText(true);
+  sheet.getRange(`C${reportingGroupMemberHeaderRow}:I${reportingGroupMemberHeaderRow}`).getFormat().setWrapText(true);
+  sheet.getRange(`C${reportingGroupMemberBodyStartRow}:I${reportingGroupMemberBodyEndRow}`)
+    .getFormat().setVerticalAlignment(ExcelScript.VerticalAlignment.center);
   sheet.getRange("H12:H13").setNumberFormat("#,##0");
   sheet.getRange("J12:J13").setNumberFormat("#,##0.00");
+  applyFinalMappingPresentation(workbook, memberCapacity, reportingGroupMemberCapacity);
   sheet.setShowGridlines(false);
+}
+
+function applyFinalMappingPresentation(
+  workbook: ExcelScript.Workbook, sourceMemberCapacity: number, reportingGroupMemberCapacity: number
+): void {
+  const sheet = requiredSheet(workbook, "Mapping");
+  const sourceCatalog = requiredTable(workbook, "tblMappingMemberCatalog");
+  const reportingGroupCatalog = requiredTable(workbook, "tblMappingReportingGroupCatalog");
+  const categoryTable = requiredTable(workbook, "tblMappingCategoryOverview");
+  const reportingGroupOverviewTable = requiredTable(workbook, "tblMappingReportingGroupOverview");
+  const priorMemberTable = requiredTable(workbook, "tblMappingMemberWorkspace");
+  const categoryValues = categoryTable.getRange().getValues();
+  const reportingGroupOverviewValues = reportingGroupOverviewTable.getRange().getValues();
+  const priorSelectionValues = priorMemberTable.getColumn("Select").getRangeBetweenHeaderAndTotal().getValues();
+
+  const visibleTableNames = ["tblMappingCategoryOverview", "tblMappingMemberWorkspace",
+    "tblMappingReportingGroupOverview", "tblMappingReportingGroupMembers"];
+  for (let tableIndex = 0; tableIndex < visibleTableNames.length; tableIndex += 1) {
+    const table = workbook.getTable(visibleTableNames[tableIndex]);
+    if (table) table.delete();
+  }
+  sheet.getRange("A19:AY1000").unmerge();
+  sheet.getRange("A19:AY1000").clear(ExcelScript.ClearApplyTo.all);
+  sheet.getRange("AP1:AY18").clear(ExcelScript.ClearApplyTo.all);
+
+  const memberSectionRow = 21;
+  const memberHeaderRow = 22;
+  const memberBodyStartRow = 23;
+  const memberBodyEndRow = memberHeaderRow + reportingGroupMemberCapacity;
+  const memberHeaders = ["Select", "Level", "Item", "Main Category", "Subcategory", "Sales Account",
+    "Reporting Group", "Mapping state", "Facts", "Sales NOK", "Attention", "Historical Quantity",
+    "SourceSystemID", "ScopeType", "NodeID", "ProductID", "ParentSubNodeID", "IdentityState",
+    "CurrentExplicitRuleID", "CurrentRuleAction", "CurrentTargetID", "CategoryChoice"];
+  sheet.getRange(`A${memberHeaderRow}:V${memberHeaderRow}`).setValues([memberHeaders]);
+  sheet.getRange(`A${memberBodyStartRow}:V${memberBodyEndRow}`).clear(ExcelScript.ClearApplyTo.contents);
+  const memberTable = sheet.addTable(`A${memberHeaderRow}:V${memberBodyEndRow}`, true);
+  memberTable.setName("tblMappingMemberWorkspace");
+  memberTable.setPredefinedTableStyle("TableStyleLight9");
+  memberTable.setShowBandedRows(false);
+  sheet.getRange("E13").setFormula('=COUNTIF(tblMappingMemberWorkspace[Select],"Yes")');
+  sheet.getRange("H13").setFormula('=SUMIFS(tblMappingMemberWorkspace[Facts],tblMappingMemberWorkspace[Select],"Yes")');
+  sheet.getRange("J13").setFormula('=SUMIFS(tblMappingMemberWorkspace[Sales NOK],tblMappingMemberWorkspace[Select],"Yes")');
+
+  const selectionValues: string[][] = [];
+  for (let rowIndex = 0; rowIndex < reportingGroupMemberCapacity; rowIndex += 1) {
+    selectionValues.push([rowIndex < sourceMemberCapacity ? text(priorSelectionValues[rowIndex] && priorSelectionValues[rowIndex][0]) : ""]);
+  }
+  sheet.getRange(`A${memberBodyStartRow}:A${memberBodyEndRow}`).setValues(selectionValues);
+
+  const sourceCatalogEndRow = sourceCatalog.getRowCount() + 1;
+  const reportingGroupCatalogEndRow = reportingGroupCatalog.getRowCount() + 1;
+  sheet.getRange("AP1").setValue("Source catalog row index");
+  const sourceIndexFormulas: string[][] = [];
+  for (let rowIndex = 0; rowIndex < sourceMemberCapacity; rowIndex += 1) {
+    sourceIndexFormulas.push([`=IF($B$10<>"Source Category","",IFERROR(AGGREGATE(15,6,(ROW('_Mapping_Audit'!$J$2:$J$${sourceCatalogEndRow})-ROW('_Mapping_Audit'!$J$2)+1)/(('_Mapping_Audit'!$AC$2:$AC$${sourceCatalogEndRow}=$B$12)*IF($E$12="All",1,'_Mapping_Audit'!$O$2:$O$${sourceCatalogEndRow}=$E$12)),ROWS($AP$2:AP${rowIndex + 2})),""))`]);
+  }
+  sheet.getRange(`AP2:AP${sourceMemberCapacity + 1}`).setFormulas(sourceIndexFormulas);
+
+  sheet.getRange("AQ1:AW1").setValues([["Category choices", "View choices", "Reporting Group choices",
+    "View source", "Reporting Group catalog row index", "Browse choices", "Browse source"]]);
+  sheet.getRange("AQ2").setFormula('=IF(COUNTIF(tblMappingMemberWorkspace[Select],"Yes")>0,$B$12,SORT(tblMappingCategoryCatalog[CategoryChoice]))');
+  sheet.getRange("AR2").setFormula('=IF(COUNTIF(tblMappingMemberWorkspace[Select],"Yes")>0,$E$12,$AT$2:$AT$6)');
+  sheet.getRange("AT2:AT6").setValues([["All"], ["Unmapped"], ["Custom"], ["Identity Pending"], ["Excluded"]]);
+  if (reportingGroupOverviewValues.length > 1) {
+    sheet.getRange(`AS2:AS${reportingGroupOverviewValues.length}`)
+      .setValues(reportingGroupOverviewValues.slice(1).map(row => [text(row[0])]));
+  }
+  sheet.getRange("AV2").setFormula('=IF(COUNTIF(tblMappingMemberWorkspace[Select],"Yes")>0,$B$10,$AW$2:$AW$3)');
+  sheet.getRange("AW2:AW3").setValues([["Source Category"], ["Reporting Group"]]);
+  const reportingGroupIndexFormulas: string[][] = [];
+  for (let rowIndex = 0; rowIndex < reportingGroupMemberCapacity; rowIndex += 1) {
+    reportingGroupIndexFormulas.push([
+      `=IF($B$10<>"Reporting Group","",IFERROR(AGGREGATE(15,6,(ROW('_Mapping_Audit'!$BU$2:$BU$${reportingGroupCatalogEndRow})-ROW('_Mapping_Audit'!$BU$2)+1)/('_Mapping_Audit'!$CC$2:$CC$${reportingGroupCatalogEndRow}=$E$10),ROWS($AU$2:AU${rowIndex + 2})),""))`
+    ]);
+  }
+  sheet.getRange(`AU2:AU${reportingGroupMemberCapacity + 1}`).setFormulas(reportingGroupIndexFormulas);
+
+  const visibleFormulas: string[][] = [];
+  const sourceColumns = ["J", "K", "AC", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC"];
+  const numericSourceColumns: { [key: string]: boolean } = { "P": true, "Q": true, "S": true };
+  const reportingGroupColumns = ["", "BU", "BV", "BW", "BX", "CC", "BY", "BZ", "CA", "", "", "", "", "", "", "", "", "", "", "", ""];
+  const numericReportingGroupColumns: { [key: string]: boolean } = { "BZ": true, "CA": true };
+  for (let rowIndex = 0; rowIndex < reportingGroupMemberCapacity; rowIndex += 1) {
+    const formulaRow: string[] = [];
+    for (let columnIndex = 0; columnIndex < sourceColumns.length; columnIndex += 1) {
+      const sourceColumn = sourceColumns[columnIndex];
+      const sourceValue = `INDEX('_Mapping_Audit'!$${sourceColumn}$2:$${sourceColumn}$${sourceCatalogEndRow},$AP${rowIndex + 2})`;
+      const sourceFormula = numericSourceColumns[sourceColumn]
+        ? `IF($AP${rowIndex + 2}="","",IFERROR(${sourceValue},""))`
+        : `IF($AP${rowIndex + 2}="","",IFERROR(${sourceValue}&"",""))`;
+      const reportingColumn = reportingGroupColumns[columnIndex];
+      let reportingFormula = '""';
+      if (columnIndex === 0) reportingFormula = `IF($AU${rowIndex + 2}="","","Product")`;
+      else if (reportingColumn) {
+        const reportingValue = `INDEX('_Mapping_Audit'!$${reportingColumn}$2:$${reportingColumn}$${reportingGroupCatalogEndRow},$AU${rowIndex + 2})`;
+        reportingFormula = numericReportingGroupColumns[reportingColumn]
+          ? `IF($AU${rowIndex + 2}="","",IFERROR(${reportingValue},""))`
+          : `IF($AU${rowIndex + 2}="","",IFERROR(${reportingValue}&"",""))`;
+      }
+      formulaRow.push(`=IF($B$10="Reporting Group",${reportingFormula},${sourceFormula})`);
+    }
+    visibleFormulas.push(formulaRow);
+  }
+  sheet.getRange(`B${memberBodyStartRow}:V${memberBodyEndRow}`).setFormulas(visibleFormulas);
+
+  sheet.getRange("A19:K19").merge();
+  sheet.getRange("A19").setFormula('=IF($B$10="Reporting Group",$E$10,$B$12)');
+  sheet.getRange("A20:K20").merge();
+  sheet.getRange("A20").setFormula(
+    '=IF($B$10="Reporting Group",$AY$2&" products · "&FIXED($AY$3,0,FALSE)&" facts · NOK "&FIXED($AY$4,2,FALSE)&" · "&$AY$5&" inherited · "&$AY$6&" custom",$AX$2&" members · "&FIXED($AX$3,0,FALSE)&" facts · NOK "&FIXED($AX$4,2,FALSE)&" · current category mapping: "&$AX$5&" · "&$AX$6&" custom · "&$AX$7&" excluded")');
+  sheet.getRange(`A${memberSectionRow}:K${memberSectionRow}`).merge();
+  sheet.getRange(`A${memberSectionRow}`).setFormula(
+    '=IF($B$10="Reporting Group","Products in "&$E$10,"Members in "&$B$12&IF($E$12="All",""," · "&$E$12))');
+  styleSectionHeader(sheet.getRange(`A${memberSectionRow}:K${memberSectionRow}`));
+
+  const categorySectionRow = 425;
+  const categoryHeaderRow = 426;
+  const categoryEndRow = categoryHeaderRow + Math.max(0, categoryValues.length - 1);
+  sheet.getRange(`A${categorySectionRow}:K${categorySectionRow}`).merge();
+  sheet.getRange(`A${categorySectionRow}`).setValue("Source Category overview — navigation and impact");
+  styleSectionHeader(sheet.getRange(`A${categorySectionRow}:K${categorySectionRow}`));
+  sheet.getRange(`A${categoryHeaderRow}:H${categoryEndRow}`).setValues(categoryValues);
+  const finalCategoryTable = sheet.addTable(`A${categoryHeaderRow}:H${categoryEndRow}`, true);
+  finalCategoryTable.setName("tblMappingCategoryOverview");
+  finalCategoryTable.setPredefinedTableStyle("TableStyleMedium2");
+
+  const reportingGroupSectionRow = categoryEndRow + 3;
+  const reportingGroupHeaderRow = reportingGroupSectionRow + 1;
+  const reportingGroupEndRow = reportingGroupHeaderRow + Math.max(0, reportingGroupOverviewValues.length - 1);
+  sheet.getRange(`A${reportingGroupSectionRow}:K${reportingGroupSectionRow}`).merge();
+  sheet.getRange(`A${reportingGroupSectionRow}`).setValue("Reporting Group overview — current effective Product membership");
+  styleSectionHeader(sheet.getRange(`A${reportingGroupSectionRow}:K${reportingGroupSectionRow}`));
+  sheet.getRange(`C${reportingGroupHeaderRow}:F${reportingGroupEndRow}`).setValues(reportingGroupOverviewValues);
+  const finalReportingGroupTable = sheet.addTable(`C${reportingGroupHeaderRow}:F${reportingGroupEndRow}`, true);
+  finalReportingGroupTable.setName("tblMappingReportingGroupOverview");
+  finalReportingGroupTable.setPredefinedTableStyle("TableStyleMedium2");
+
+  sheet.getRange("AX1:AY1").setValues([["Source context", "Reporting Group context"]]);
+  sheet.getRange("AX2").setFormula('=COUNTIF(tblMappingMemberCatalog[CategoryChoice],$B$12)');
+  sheet.getRange("AX3").setFormula('=SUMIFS(tblMappingMemberCatalog[Facts],tblMappingMemberCatalog[CategoryChoice],$B$12,tblMappingMemberCatalog[Level],"Product")');
+  sheet.getRange("AX4").setFormula('=SUMIFS(tblMappingMemberCatalog[Sales NOK],tblMappingMemberCatalog[CategoryChoice],$B$12,tblMappingMemberCatalog[Level],"Product")');
+  sheet.getRange("AX5").setFormula('=IFERROR(XLOOKUP($B$12,tblMappingCategoryOverview[Main Category],tblMappingCategoryOverview[Current Reporting Group]),"Unmapped")');
+  sheet.getRange("AX6").setFormula('=COUNTIFS(tblMappingMemberCatalog[CategoryChoice],$B$12,tblMappingMemberCatalog[Level],"Product",tblMappingMemberCatalog[Mapping state],"Custom")');
+  sheet.getRange("AX7").setFormula('=COUNTIFS(tblMappingMemberCatalog[CategoryChoice],$B$12,tblMappingMemberCatalog[Level],"Product",tblMappingMemberCatalog[Mapping state],"Excluded")');
+  sheet.getRange("AY2").setFormula('=XLOOKUP($E$10,tblMappingReportingGroupOverview[Reporting Group],tblMappingReportingGroupOverview[Products],0)');
+  sheet.getRange("AY3").setFormula('=XLOOKUP($E$10,tblMappingReportingGroupOverview[Reporting Group],tblMappingReportingGroupOverview[Facts],0)');
+  sheet.getRange("AY4").setFormula('=XLOOKUP($E$10,tblMappingReportingGroupOverview[Reporting Group],tblMappingReportingGroupOverview[Sales NOK],0)');
+  sheet.getRange("AY5").setFormula('=COUNTIFS(tblMappingReportingGroupCatalog[Reporting Group],$E$10,tblMappingReportingGroupCatalog[Mapping state],"Inherited")');
+  sheet.getRange("AY6").setFormula('=COUNTIFS(tblMappingReportingGroupCatalog[Reporting Group],$E$10,tblMappingReportingGroupCatalog[Mapping state],"Custom")');
+
+  // Keep action eligibility and assignment targets same-sheet so Excel for the web
+  // can resolve the visible merged-cell dropdowns reliably after recalculation.
+  sheet.getRange("AL1:AN10").clear(ExcelScript.ClearApplyTo.all);
+  sheet.getRange("AL1:AN1").setValues([["Mapping action state", "Eligible action choices", "Eligible Reporting Group choices"]]);
+  sheet.getRange("AL2").setFormula('=COUNTIF(tblMappingMemberWorkspace[Select],"Yes")');
+  sheet.getRange("AL3").setFormula('=COUNTIFS(tblMappingMemberWorkspace[Select],"Yes",tblMappingMemberWorkspace[IdentityState],"Identity Pending")+COUNTIFS(tblMappingMemberWorkspace[Select],"Yes",tblMappingMemberWorkspace[Mapping state],"Conflict")+COUNTIFS(tblMappingMemberWorkspace[Select],"Yes",tblMappingMemberWorkspace[Mapping state],"Inactive Target")');
+  sheet.getRange("AL4").setFormula('=IF(OR($AL$2=0,$B$13<>"Selected members"),0,IF(AND(COUNTIFS(tblMappingMemberWorkspace[Select],"Yes",tblMappingMemberWorkspace[ScopeType],"SourceMainCategory")>0,$AL$2>COUNTIFS(tblMappingMemberWorkspace[Select],"Yes",tblMappingMemberWorkspace[ScopeType],"SourceMainCategory")),1,0)+SUMPRODUCT((tblMappingMemberWorkspace[Select]="Yes")*(tblMappingMemberWorkspace[ScopeType]="Product")*(COUNTIFS(tblMappingMemberWorkspace[Select],"Yes",tblMappingMemberWorkspace[ScopeType],"SourceSubCategory",tblMappingMemberWorkspace[NodeID],tblMappingMemberWorkspace[ParentSubNodeID])>0)))');
+  sheet.getRange("AL5").setFormula('=COUNTIFS(tblMappingMemberWorkspace[Select],"Yes",tblMappingMemberWorkspace[ScopeType],"Product")');
+  sheet.getRange("AL6").setFormula('=SUMPRODUCT((tblMappingMemberWorkspace[Select]="Yes")*(LEN(tblMappingMemberWorkspace[CurrentExplicitRuleID])>0))');
+  sheet.getRange("AL7").setFormula('=SUMPRODUCT((tblMappingMemberCatalog[CategoryChoice]=$B$12)*(tblMappingMemberCatalog[Level]="Main Category")*(LEN(tblMappingMemberCatalog[CurrentExplicitRuleID])>0))');
+  sheet.getRange("AL8").setFormula('=AND($B$10="Source Category",IF($B$13="Selected members",AND($AL$2>0,SUMPRODUCT((tblMappingMemberWorkspace[Select]="Yes")*(LEN(tblMappingMemberWorkspace[NodeID])>0))=$AL$2,$AL$3=0,$AL$4=0),AND($B$13="Entire shown category",$B$12<>"",$AL$2=0)))');
+  sheet.getRange("AM2").setFormula('=IF($AL$8,"Assign Reporting Group","")');
+  sheet.getRange("AM3").setFormula('=IF(AND($AL$8,$B$13="Selected members",$AL$5=$AL$2),"Leave Unmapped","")');
+  sheet.getRange("AM4").setFormula('=IF(AND($AL$8,IF($B$13="Selected members",$AL$6=$AL$2,$AL$7>0)),"Remove custom mapping","")');
+  const assignTargetFormulas: string[][] = [];
+  const activeGroupCount = Math.max(0, reportingGroupOverviewValues.length - 1);
+  for (let groupIndex = 0; groupIndex < activeGroupCount; groupIndex += 1) {
+    assignTargetFormulas.push([`=IF(AND($AL$8,$B$15="Assign Reporting Group"),$AS$${groupIndex + 2},"")`]);
+  }
+  if (assignTargetFormulas.length) sheet.getRange(`AN2:AN${activeGroupCount + 1}`).setFormulas(assignTargetFormulas);
+
+  sheet.getRange("A11:K11").unmerge();
+  sheet.getRange("A11:K11").merge();
+  sheet.getRange("A11").setFormula('=IF($B$10="Reporting Group","Reporting Group membership","Source Category mapping")');
+  styleSectionHeader(sheet.getRange("A11:K11"));
+  sheet.getRange("A14:N14").unmerge();
+  sheet.getRange("A14:K14").merge();
+  sheet.getRange("A14").setFormula('=IF($B$10="Reporting Group","Read-only membership inspection. Return to Source Category to change mappings.","Use Select = Yes or No. Select one or more members, choose an action, and apply once. Use Entire shown category only for an intentional category-wide rule.")');
+  sheet.getRange("G10:K10").unmerge();
+  sheet.getRange("G10:K10").merge();
+  const controlMergeRanges = ["B10:C10", "E10:F10", "B12:C12", "E12:F12", "B13:C13",
+    "E13:F13", "J12:K12", "J13:K13", "B15:C15", "E15:F15"];
+  for (let rangeIndex = 0; rangeIndex < controlMergeRanges.length; rangeIndex += 1) {
+    const controlRange = sheet.getRange(controlMergeRanges[rangeIndex]);
+    controlRange.unmerge();
+    controlRange.merge();
+  }
+  sheet.getRange("A17:K17").unmerge();
+  sheet.getRange("A17:K17").merge();
+  sheet.getRange("A18:K18").unmerge();
+  sheet.getRange("A18:K18").merge();
+  styleInput(sheet.getRange("B10:C10")); styleInput(sheet.getRange("E10:F10"));
+  styleInput(sheet.getRange("B12:C12")); styleInput(sheet.getRange("E12:F12"));
+  styleInput(sheet.getRange("B13:C13")); styleInput(sheet.getRange("B15:C15"));
+  styleInput(sheet.getRange("E15:F15"));
+  sheet.getRange("G10").setFormula('=IF($B$10="Reporting Group","Read-only membership · "&$E$10,"Source Category mapping mode")');
+  sheet.getRange("G12").setFormula('=IF($B$10="Reporting Group","Products","Active members")');
+  sheet.getRange("H12").setFormula(`=IF($B$10="Reporting Group",COUNT($AU$2:$AU$${reportingGroupMemberCapacity + 1}),COUNT($AP$2:$AP$${sourceMemberCapacity + 1}))`);
+  sheet.getRange("I12").setFormula('=IF($B$10="Reporting Group","Group Sales NOK","Shown Sales NOK")');
+  sheet.getRange("J12").setFormula(`=IFERROR(SUMIFS($J$${memberBodyStartRow}:$J$${memberBodyEndRow},$B$${memberBodyStartRow}:$B$${memberBodyEndRow},"Product"),0)`);
+
+  sheet.getRange(`I${memberBodyStartRow}:I${memberBodyEndRow}`).setNumberFormat("#,##0");
+  sheet.getRange(`J${memberBodyStartRow}:J${memberBodyEndRow}`).setNumberFormat("#,##0.00");
+  sheet.getRange(`L${memberBodyStartRow}:L${memberBodyEndRow}`).setNumberFormat("#,##0.000000");
+  sheet.getRange(`D${categoryHeaderRow + 1}:F${categoryEndRow}`).setNumberFormat("#,##0");
+  sheet.getRange(`G${categoryHeaderRow + 1}:G${categoryEndRow}`).setNumberFormat("#,##0.00");
+  sheet.getRange(`D${reportingGroupHeaderRow + 1}:E${reportingGroupEndRow}`).setNumberFormat("#,##0");
+  sheet.getRange(`F${reportingGroupHeaderRow + 1}:F${reportingGroupEndRow}`).setNumberFormat("#,##0.00");
+
+  const selectFormat = sheet.getRange(`A${memberBodyStartRow}:A${memberBodyStartRow + sourceMemberCapacity - 1}`)
+    .addConditionalFormat(ExcelScript.ConditionalFormatType.custom);
+  selectFormat.getCustom().getRule().setFormula(`=AND($B$10="Source Category",$B${memberBodyStartRow}<>"")`);
+  selectFormat.getCustom().getFormat().getFill().setColor("#FFF4CE");
+  const readOnlyFormat = sheet.getRange("A12:J16").addConditionalFormat(ExcelScript.ConditionalFormatType.custom);
+  readOnlyFormat.getCustom().getRule().setFormula('=$B$10="Reporting Group"');
+  readOnlyFormat.getCustom().getFormat().getFill().setColor("#F2F4F7");
+  readOnlyFormat.getCustom().getFormat().getFont().setColor("#7F8C8D");
+
+  sheet.getRange("A19:K19").getFormat().getFill().setColor("#EAF2FF");
+  sheet.getRange("A19:K19").getFormat().getFont().setBold(true);
+  sheet.getRange("A19:K19").getFormat().getFont().setSize(14);
+  sheet.getRange("A20:K20").getFormat().getFill().setColor("#F7F9FC");
+  sheet.getRange("A19:K20").getFormat().setVerticalAlignment(ExcelScript.VerticalAlignment.center);
+  sheet.getRange("A19:K20").getFormat().setWrapText(true);
+  sheet.getRange(`${memberHeaderRow}:${memberHeaderRow}`).getFormat().setRowHeight(32);
+  sheet.getRange(`${memberBodyStartRow}:${memberBodyEndRow}`).getFormat().setRowHeight(23);
+  sheet.getRange(`A${memberHeaderRow}:K${memberHeaderRow}`).getFormat().setWrapText(true);
+  sheet.getRange(`A${memberBodyStartRow}:K${memberBodyEndRow}`).getFormat().setVerticalAlignment(ExcelScript.VerticalAlignment.center);
+  sheet.getRange(`A${memberBodyStartRow}:K${memberBodyEndRow}`).getFormat().setWrapText(false);
+  sheet.getRange(`C${memberBodyStartRow}:H${memberBodyEndRow}`).getFormat().setWrapText(true);
+  sheet.getRange(`K${memberBodyStartRow}:K${memberBodyEndRow}`).getFormat().setWrapText(true);
+  sheet.getRange(`C${memberBodyStartRow}:K${memberBodyEndRow}`).getFormat().autofitRows();
+  sheet.getRange(`${categorySectionRow}:${reportingGroupEndRow}`).getFormat().setRowHeight(24);
+  sheet.getRange(`${categorySectionRow}:${categoryHeaderRow}`).getFormat().setRowHeight(28);
+  sheet.getRange(`${reportingGroupSectionRow}:${reportingGroupHeaderRow}`).getFormat().setRowHeight(28);
+  sheet.getRange(`A${categoryHeaderRow + 1}:C${categoryEndRow}`).getFormat().setWrapText(true);
+  sheet.getRange(`H${categoryHeaderRow + 1}:H${categoryEndRow}`).getFormat().setWrapText(true);
+  sheet.getRange(`${categoryHeaderRow + 1}:${categoryEndRow}`).getFormat().autofitRows();
+  sheet.getRange(`A${categoryHeaderRow}:H${categoryHeaderRow}`).getFormat().setWrapText(true);
+  sheet.getRange(`C${reportingGroupHeaderRow}:F${reportingGroupHeaderRow}`).getFormat().setWrapText(true);
+  sheet.getRange("A10:K17").getFormat().setVerticalAlignment(ExcelScript.VerticalAlignment.center);
+  const centeredControlRanges = ["B10:C10", "E10:F10", "B12:C12", "E12:F12", "B13:C13",
+    "E13:F13", "H12", "H13", "J12:K12", "J13:K13", "B15:C15", "E15:F15", "G10:K10"];
+  for (let rangeIndex = 0; rangeIndex < centeredControlRanges.length; rangeIndex += 1) {
+    sheet.getRange(centeredControlRanges[rangeIndex]).getFormat()
+      .setHorizontalAlignment(ExcelScript.HorizontalAlignment.center);
+  }
+  const leftAlignedControlRanges = ["A10", "D10", "A11:K11", "A12", "D12", "G12", "I12",
+    "A13", "D13", "G13", "I13", "A14:K14", "A15", "D15", "G15", "H15:K16", "A17:K17"];
+  for (let rangeIndex = 0; rangeIndex < leftAlignedControlRanges.length; rangeIndex += 1) {
+    sheet.getRange(leftAlignedControlRanges[rangeIndex]).getFormat()
+      .setHorizontalAlignment(ExcelScript.HorizontalAlignment.left);
+  }
+  const centeredMemberColumns = ["Select", "Level", "Reporting Group", "Mapping state", "Facts", "Sales NOK"];
+  for (let columnIndex = 0; columnIndex < centeredMemberColumns.length; columnIndex += 1) {
+    memberTable.getColumn(centeredMemberColumns[columnIndex]).getRange().getFormat()
+      .setHorizontalAlignment(ExcelScript.HorizontalAlignment.center);
+  }
+  const leftAlignedMemberColumns = ["Item", "Main Category", "Subcategory", "Sales Account", "Attention"];
+  for (let columnIndex = 0; columnIndex < leftAlignedMemberColumns.length; columnIndex += 1) {
+    memberTable.getColumn(leftAlignedMemberColumns[columnIndex]).getRange().getFormat()
+      .setHorizontalAlignment(ExcelScript.HorizontalAlignment.left);
+  }
+  const centeredCategoryColumns = ["Current Reporting Group", "Mapping state", "Subcategories", "Products",
+    "Historical Facts", "Historical Sales NOK"];
+  for (let columnIndex = 0; columnIndex < centeredCategoryColumns.length; columnIndex += 1) {
+    finalCategoryTable.getColumn(centeredCategoryColumns[columnIndex]).getRange().getFormat()
+      .setHorizontalAlignment(ExcelScript.HorizontalAlignment.center);
+  }
+  finalCategoryTable.getColumn("Main Category").getRange().getFormat()
+    .setHorizontalAlignment(ExcelScript.HorizontalAlignment.left);
+  finalCategoryTable.getColumn("Attention").getRange().getFormat()
+    .setHorizontalAlignment(ExcelScript.HorizontalAlignment.left);
+  finalReportingGroupTable.getColumn("Reporting Group").getRange().getFormat()
+    .setHorizontalAlignment(ExcelScript.HorizontalAlignment.left);
+  const centeredReportingGroupColumns = ["Products", "Facts", "Sales NOK"];
+  for (let columnIndex = 0; columnIndex < centeredReportingGroupColumns.length; columnIndex += 1) {
+    finalReportingGroupTable.getColumn(centeredReportingGroupColumns[columnIndex]).getRange().getFormat()
+      .setHorizontalAlignment(ExcelScript.HorizontalAlignment.center);
+  }
+  sheet.getRange("A14:K14").getFormat().setWrapText(true);
+  sheet.getRange("A17:K17").getFormat().setWrapText(true);
+  sheet.getRange("10:10").getFormat().setRowHeight(28);
+  sheet.getRange("11:13").getFormat().setRowHeight(26);
+  sheet.getRange("14:14").getFormat().setRowHeight(34);
+  sheet.getRange("15:17").getFormat().setRowHeight(26);
+  sheet.getRange("18:18").getFormat().setRowHeight(6);
+  sheet.getRange("19:19").getFormat().setRowHeight(28);
+  sheet.getRange("20:20").getFormat().setRowHeight(34);
+  sheet.getRange("21:21").getFormat().setRowHeight(28);
+  setWidths(sheet, [68, 82, 112, 80, 82, 92, 96, 72, 90, 96, 86]);
+  sheet.getRange("L:AY").setColumnHidden(true);
+  sheet.getFreezePanes().freezeRows(2);
+  workbook.getApplication().calculate(ExcelScript.CalculationType.full);
 }
 
 function writeMappingLists(workbook: ExcelScript.Workbook, groups: ReportingGroup[]): void {
@@ -1035,32 +1515,34 @@ function wireMappingValidation(workbook: ExcelScript.Workbook): string {
   const statusSource = listsSheet.getRange("D2:D3");
   const ruleActionSource = listsSheet.getRange("E2:E3");
   const failures: string[] = [];
+  applyRangeValidation(sheet.getRange("B10"), sheet.getRange("AV2:AV3"), "Mapping!B10 Browse by", failures);
   applyRangeValidation(sheet.getRange("B12"), sheet.getRange("AQ2:AQ200"), "Mapping!B12 Show category", failures);
   applyRangeValidation(sheet.getRange("E12"), sheet.getRange("AR2:AR10"), "Mapping!E12 member view", failures);
   applyLiteralValidation(sheet.getRange("B13"), ["Selected members", "Entire shown category"], "Mapping!B13 apply scope", failures);
-  applyLiteralValidation(sheet.getRange("B15"), ["Assign Reporting Group", "Leave Unmapped", "Remove custom mapping"], "Mapping!B15 action", failures);
+  applyRangeValidation(sheet.getRange("B15:C15"), sheet.getRange("AM2:AM4"), "Mapping!B15:C15 action", failures);
   const groupNames = requiredTable(workbook, "tblReportingGroups").getRangeBetweenHeaderAndTotal().getValues()
     .filter(row => text(row[3]) === "Yes").map(row => text(row[1])).filter(value => value !== "");
   if (groupNames.some(value => value.indexOf(",") >= 0)) {
-    applyRangeValidation(sheet.getRange("E15"), sheet.getRange(`AS2:AS${Math.max(2, groupNames.length + 1)}`), "Mapping!E15 Reporting Group", failures);
+    applyRangeValidation(sheet.getRange("E10"), sheet.getRange(`AS2:AS${Math.max(2, groupNames.length + 1)}`), "Mapping!E10 Reporting Group membership", failures);
+    applyRangeValidation(sheet.getRange("E15:F15"), sheet.getRange(`AN2:AN${Math.max(2, groupNames.length + 1)}`), "Mapping!E15:F15 Reporting Group", failures);
   } else {
-    applyLiteralValidation(sheet.getRange("E15"), groupNames, "Mapping!E15 Reporting Group", failures);
+    applyLiteralValidation(sheet.getRange("E10"), groupNames, "Mapping!E10 Reporting Group membership", failures);
+    applyRangeValidation(sheet.getRange("E15:F15"), sheet.getRange(`AN2:AN${Math.max(2, groupNames.length + 1)}`), "Mapping!E15:F15 Reporting Group", failures);
   }
-  const memberTable = requiredTable(workbook, "tblMappingMemberWorkspace");
-  applyLiteralValidation(memberTable.getColumn("Select").getRangeBetweenHeaderAndTotal(), ["Yes"], "Mapping member selections", failures);
+  requiredTable(workbook, "tblMappingMemberWorkspace");
+  applyLiteralValidation(sheet.getRange("A23:A172"), ["Yes", "No"], "Mapping member selections", failures);
   applyListValidation(rulesSheet.getRange("C5:C1000"),scopeSource,"Mapping Rules!C5:C1000 ScopeType",failures);
   applyListValidation(rulesSheet.getRange("G5:G1000"),activeGroupSource,"Mapping Rules!G5:G1000 TargetReportingGroupID",failures);
   applyListValidation(rulesSheet.getRange("J5:J1000"),statusSource,"Mapping Rules!J5:J1000 Status",failures);
   applyListValidation(rulesSheet.getRange("M5:M1000"),ruleActionSource,"Mapping Rules!M5:M1000 RuleAction",failures);
   const message = failures.length
     ? `PUL-0301-013: ${failures.length} dropdown validation(s) unavailable; mapping refresh completed. ${failures.join(" | ")}`
-    : "Mapping workspace dropdowns ready (10/10).";
-  sheet.getRange("A18").setValue(message);
-  const statusBand=sheet.getRange("A18:J18");
-  statusBand.getFormat().getFill().setColor(failures.length?"#FCE8E6":"#E2F0D9");
-  statusBand.getFormat().getFont().setBold(true);
-  statusBand.getFormat().setWrapText(true);
-  sheet.getRange("18:18").getFormat().setRowHeight(failures.length?72:28);
+    : "Mapping workspace dropdowns ready (12/12).";
+  const statusBand=sheet.getRange("A18:K18");
+  statusBand.clear(ExcelScript.ClearApplyTo.contents);
+  statusBand.getFormat().getFill().setColor("#FFFFFF");
+  statusBand.getFormat().getFont().setBold(false);
+  sheet.getRange("18:18").getFormat().setRowHeight(6);
   failures.forEach(failure=>console.log(`PUL-0301-013 ${failure}`));
   return message;
 }
@@ -1087,45 +1569,54 @@ function restoreWeeklyMappingHealthBlock(workbook: ExcelScript.Workbook, refresh
   const controlValues = control.getRangeBetweenHeaderAndTotal().getValues();
   if (controlValues.length !== 1) return;
   const controlHeaders = headerMap(control);
-  const health = text(controlValues[0][controlHeaders.HealthStatus]);
   const through = text(controlValues[0][controlHeaders.ThroughPeriodLabel]);
-  const productValues: (string | number)[] = ["Products"];
-  const factValues: (string | number)[] = ["Historical facts"];
-  const salesValues: (string | number)[] = ["Historical Sales NOK"];
-  for (let stateIndex = 0; stateIndex < states.length; stateIndex += 1) {
-    productValues.push(counts[states[stateIndex]].products);
-    factValues.push(counts[states[stateIndex]].facts);
-    salesValues.push(counts[states[stateIndex]].sales);
-  }
   mapping.getRange("A4:N9").unmerge();
-  mapping.getRange("A4:N9").clear(ExcelScript.ClearApplyTo.formats);
-  mapping.getRange("A4:N4").merge();
-  mapping.getRange("A4").setValue(`Weekly mapping health — ${health}`);
-  mapping.getRange("A5:F5").setValues([[
-    "Metric", "Mapped", "Unmapped", "Identity Pending", "Conflict", "Inactive Target"
-  ]]);
-  mapping.getRange("A6:F6").setValues([productValues]);
-  mapping.getRange("A7:F7").setValues([factValues]);
-  mapping.getRange("A8:F8").setValues([salesValues]);
-  mapping.getRange("A9:N9").merge();
+  mapping.getRange("A4:N9").clear(ExcelScript.ClearApplyTo.all);
+  mapping.getRange("A4:K4").merge();
+  const structuralConcern = counts["Conflict"].products > 0 || counts["Inactive Target"].products > 0;
+  const businessAttention = counts["Unmapped"].products > 0 || counts["Identity Pending"].products > 0;
+  mapping.getRange("A4").setValue(structuralConcern
+    ? "Mapping health — Structural review required"
+    : businessAttention ? "Mapping health — Attention required" : "Mapping health — Up to date");
+  const cardStarts = ["A", "D", "F", "H", "J"];
+  const cardEnds = ["C", "E", "G", "I", "K"];
+  const cardFills = ["#E2F0D9", "#FFF4CE", "#FFF4CE",
+    counts["Conflict"].products > 0 ? "#FCE8E6" : "#F2F4F7",
+    counts["Inactive Target"].products > 0 ? "#FCE8E6" : "#F2F4F7"];
+  for (let stateIndex = 0; stateIndex < states.length; stateIndex += 1) {
+    const topLeft = cardStarts[stateIndex];
+    const bottomRight = cardEnds[stateIndex];
+    for (let row = 5; row <= 8; row += 1) mapping.getRange(`${topLeft}${row}:${bottomRight}${row}`).merge();
+    mapping.getRange(`${topLeft}5`).setValue(states[stateIndex]);
+    mapping.getRange(`${topLeft}6`).setValue(counts[states[stateIndex]].products);
+    mapping.getRange(`${topLeft}7`).setValue(counts[states[stateIndex]].facts);
+    mapping.getRange(`${topLeft}8`).setValue(counts[states[stateIndex]].sales);
+    mapping.getRange(`${topLeft}5:${bottomRight}5`).getFormat().getFill().setColor(cardFills[stateIndex]);
+    mapping.getRange(`${topLeft}5:${bottomRight}5`).getFormat().getFont().setBold(true);
+    mapping.getRange(`${topLeft}6:${bottomRight}6`).setNumberFormat('#,##0 "products"');
+    mapping.getRange(`${topLeft}7:${bottomRight}7`).setNumberFormat('#,##0 "facts"');
+    mapping.getRange(`${topLeft}8:${bottomRight}8`).setNumberFormat('"NOK " #,##0.00');
+  }
+  mapping.getRange("A9:K9").merge();
   mapping.getRange("A9").setValue(refreshRequired
     ? "Performance refresh required"
     : `Performance classifications are up to date through ${through}`);
-  mapping.getRange("A4:N4").getFormat().getFill().setColor("#17365D");
-  mapping.getRange("A4:N4").getFormat().getFont().setColor("#FFFFFF");
-  mapping.getRange("A4:N4").getFormat().getFont().setBold(true);
-  mapping.getRange("A5:F5").getFormat().getFill().setColor("#D9EAF7");
-  mapping.getRange("A5:F5").getFormat().getFont().setBold(true);
-  mapping.getRange("A6:A8").getFormat().getFont().setBold(true);
-  mapping.getRange("B6:F7").setNumberFormat("#,##0");
-  mapping.getRange("B8:F8").setNumberFormat("#,##0.00");
-  mapping.getRange("A9:N9").getFormat().getFill().setColor(refreshRequired ? "#FFF4CE" : "#E2F0D9");
-  mapping.getRange("A9:N9").getFormat().getFont().setBold(true);
-  mapping.getRange("A4:N9").getFormat().setVerticalAlignment(ExcelScript.VerticalAlignment.center);
-  mapping.getRange("A4:N9").getFormat().setWrapText(true);
-  mapping.getRange("4:5").getFormat().setRowHeight(26);
-  mapping.getRange("6:8").getFormat().setRowHeight(22);
-  mapping.getRange("9:9").getFormat().setRowHeight(28);
+  mapping.getRange("A4:K4").getFormat().getFill().setColor("#17365D");
+  mapping.getRange("A4:K4").getFormat().getFont().setColor("#FFFFFF");
+  mapping.getRange("A4:K4").getFormat().getFont().setBold(true);
+  mapping.getRange("A9:K9").getFormat().getFill().setColor(refreshRequired ? "#FFF4CE" : "#E2F0D9");
+  mapping.getRange("A9:K9").getFormat().getFont().setBold(true);
+  mapping.getRange("A4:K9").getFormat().setVerticalAlignment(ExcelScript.VerticalAlignment.center);
+  mapping.getRange("A4:K4").getFormat().setHorizontalAlignment(ExcelScript.HorizontalAlignment.left);
+  for (let stateIndex = 0; stateIndex < cardStarts.length; stateIndex += 1) {
+    mapping.getRange(`${cardStarts[stateIndex]}5:${cardEnds[stateIndex]}8`).getFormat()
+      .setHorizontalAlignment(ExcelScript.HorizontalAlignment.center);
+  }
+  mapping.getRange("A9:K9").getFormat().setHorizontalAlignment(ExcelScript.HorizontalAlignment.left);
+  mapping.getRange("A4:K9").getFormat().setWrapText(true);
+  mapping.getRange("4:5").getFormat().setRowHeight(24);
+  mapping.getRange("6:8").getFormat().setRowHeight(20);
+  mapping.getRange("9:9").getFormat().setRowHeight(26);
 }
 
 function applyListValidation(target:ExcelScript.Range,sourceRange:ExcelScript.Range,label:string,failures:string[]):void{
