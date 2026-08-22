@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
   WEEKLY_PERFORMANCE_CONTRACT_VERSION,
+  activeWeeklyPerformanceReportingGroups,
+  buildWeeklyPerformanceLayout,
   buildWeeklyPerformanceComparison,
+  planWeeklyPerformanceRpgSelection,
   validateWeeklyPeriodSelection,
 } from "../src/reporting/weekly-performance.mjs";
 
@@ -144,11 +147,11 @@ test("Office Script resolves one dynamic Active authority without frozen WCV/WCC
   assert.match(script, /DenseRPGCacheRowCount/);
 });
 
-test("weekly cache replaces only Phase 2C additive component inputs", () => {
-  assert.match(script, /writeWeeklyComponentBlock\(calc, "AN", true, true\)/);
-  assert.match(script, /writeWeeklyComponentBlock\(calc, "AX", true, false\)/);
-  assert.match(script, /writeWeeklyComponentBlock\(calc, "BR", false, true\)/);
-  assert.match(script, /writeWeeklyComponentBlock\(calc, "CB", false, false\)/);
+test("weekly cache remains the sole additive input while helper capacity is dynamic", () => {
+  assert.match(script, /writeWeeklyComponentBlock\(calc, layout, 0, true, true\)/);
+  assert.match(script, /writeWeeklyComponentBlock\(calc, layout, 1, true, false\)/);
+  assert.match(script, /writeWeeklyComponentBlock\(calc, layout, 3, false, true\)/);
+  assert.match(script, /writeWeeklyComponentBlock\(calc, layout, 4, false, false\)/);
   assert.match(script, /numerator \? "tblWeeklyRPGCache" : "tblWeeklyScopeCache"/);
   assert.match(script, /numerator \? "MappedSalesNOK" : "SourceSalesNOK"/);
   assert.match(script, /SUM\(SUMIFS/);
@@ -160,16 +163,62 @@ test("weekly cache replaces only Phase 2C additive component inputs", () => {
 
 test("weekly component Grand Totals sum their own RPG columns without an offset", () => {
   assert.match(script, /columnName\(startIndex \+ group\)/);
-  assert.doesNotMatch(script, /columnName\(startIndex \+ group \+ 1\)/);
+  assert.match(script, /componentTotalRow/);
 });
 
-test("Phase 2C numeric, Total, sorting, facade and selection formulas are not rewritten", () => {
-  assert.doesNotMatch(script, /writeNumericDisplayBlock|writeTotalAndSortHelpers|matrixFacadeFormula|SORTBY\(/);
-  assert.doesNotMatch(script, /tblPerformanceRestaurantSelection\[[^\]]+\].*set|tblPerformanceRPGSelection\[[^\]]+\].*set/);
+test("dynamic installer rebuilds the accepted Phase 2C helper and presentation contracts", () => {
+  assert.match(script, /writeNumericDisplayBlock|writeTotalAndSortHelpers|matrixFacadeFormula|SORTBY\(/);
+  assert.match(script, /table\.resize\(target\)/);
+  assert.match(script, /prior\.exists \? "No" : "Yes"/);
+  assert.match(script, /tblPerformanceRPGSelection\[Include\]="Yes"/);
+  assert.doesNotMatch(script, /const GROUP_CAPACITY\s*=|activeGroups\.length\s*!==\s*9/);
   assert.match(phase2C, /NOK Impact/);
   assert.match(phase2C, /Grand Total/);
   assert.match(phase2C, /FIXED\(/);
   assert.match(phase2C, /SORTBY\(/);
+});
+
+test("nine-group runtime geometry remains unchanged and ten groups expand deterministically", () => {
+  const nine = buildWeeklyPerformanceLayout({
+    reportingGroups: reportingGroups(9), restaurantCapacity: 16,
+  });
+  const ten = buildWeeklyPerformanceLayout({
+    reportingGroups: reportingGroups(10), restaurantCapacity: 16,
+  });
+  assert.deepEqual(nine.componentBlocks, [39, 49, 59, 69, 79, 89]);
+  assert.equal(nine.numericDisplayStartColumn, 99);
+  assert.equal(nine.totalComponentStartColumn, 109);
+  assert.equal(nine.periodKeyStartColumn, 117);
+  assert.equal(nine.matrixEndColumn, 10);
+  assert.deepEqual(ten.componentBlocks, [39, 50, 61, 72, 83, 94]);
+  assert.equal(ten.numericDisplayStartColumn, 105);
+  assert.equal(ten.totalComponentStartColumn, 116);
+  assert.equal(ten.periodKeyStartColumn, 124);
+  assert.equal(ten.matrixEndColumn, 11);
+});
+
+test("existing selections survive by stable ID and a newly active tenth group defaults No", () => {
+  const rows = planWeeklyPerformanceRpgSelection({
+    reportingGroups: reportingGroups(10),
+    priorCatalogExists: true,
+    priorRows: reportingGroups(9).map((row, index) => ({
+      id: row.reportingGroupId, include: index === 4 ? "No" : "Yes",
+    })),
+  });
+  assert.equal(rows.length, 10);
+  assert.equal(rows[4].include, "No");
+  assert.equal(rows[8].include, "Yes");
+  assert.deepEqual(rows[9], { id: "RPG-0010", name: "Group 10", include: "No" });
+});
+
+test("active-group contract rejects empty, duplicate ID, and duplicate active SortOrder", () => {
+  assert.throws(() => activeWeeklyPerformanceReportingGroups([]), /At least one/);
+  assert.throws(() => activeWeeklyPerformanceReportingGroups([
+    ...reportingGroups(1), { ...reportingGroups(1)[0] },
+  ]), /repeats ReportingGroupID/);
+  assert.throws(() => activeWeeklyPerformanceReportingGroups([
+    ...reportingGroups(1), { ...reportingGroups(1)[0], reportingGroupId: "RPG-0002" },
+  ]), /repeat SortOrder/);
 });
 
 test("Reports follows generated period summaries while legacy results remain rollback-only", () => {
@@ -234,6 +283,15 @@ function freshness(overrides = {}) {
     identityPreflightFingerprint: "IDP-test", performanceRestaurantScopeFingerprint: "RSC-test",
     ...overrides,
   };
+}
+
+function reportingGroups(count) {
+  return Array.from({ length: count }, (_, index) => ({
+    reportingGroupId: `RPG-${String(index + 1).padStart(4, "0")}`,
+    reportingGroupName: `Group ${index + 1}`,
+    active: "Yes",
+    sortOrder: (index + 1) * 10,
+  }));
 }
 
 function assertBalanced(source) {

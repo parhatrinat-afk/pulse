@@ -5,6 +5,7 @@ import {
 import {
   WEEKLY_CACHE_STATES,
   WEEKLY_COMPACT_CACHE_SCHEMA_VERSION,
+  activeReportingGroups as normalizeActiveReportingGroups,
   buildCandidateWeeklyCache,
   fingerprintWeeklyCacheRows,
 } from "./weekly-compact-cache.mjs";
@@ -483,7 +484,19 @@ function validateCompleteCacheRows({
   const periods = Array.isArray(periodManifest) ? periodManifest : [];
   const scopes = Array.isArray(scopeCacheRows) ? scopeCacheRows : [];
   const rpgs = Array.isArray(weeklyRpgCacheRows) ? weeklyRpgCacheRows : [];
-  const groups = Array.isArray(activeReportingGroups) ? activeReportingGroups : [];
+  let groups = [];
+  try {
+    groups = normalizeActiveReportingGroups(Array.isArray(activeReportingGroups)
+      ? activeReportingGroups.map(row => ({
+        reportingGroupId: row.reportingGroupId,
+        reportingGroupName: row.reportingGroupName,
+        active: "Yes",
+        sortOrder: row.sortOrder,
+      }))
+      : []);
+  } catch (error) {
+    errors.push(String(error instanceof Error ? error.message : error));
+  }
   const periodKeys = new Set();
   for (const row of periods) {
     if (periodKeys.has(row.sourcePeriodKey)) errors.push(`Duplicate period ${row.sourcePeriodKey}.`);
@@ -498,15 +511,26 @@ function validateCompleteCacheRows({
     const coverage = sumMetrics(WEEKLY_CACHE_STATES.map(state => stateMetric(row, CACHE_STATE_FIELDS[state])));
     if (!metricsEqual(source, coverage)) errors.push(`${row.sourcePeriodKey}/${row.restaurantId} coverage does not reconcile.`);
   }
+  const activeGroupIds = new Set(groups.map(row => row.reportingGroupId));
   const rpgGrains = new Set();
   for (const row of rpgs) {
     const grain = `${row.cacheVersion}|${row.sourcePeriodKey}|${row.restaurantId}|${row.reportingGroupId}`;
     if (rpgGrains.has(grain)) errors.push(`Duplicate RPG grain ${grain}.`);
     rpgGrains.add(grain);
+    if (!activeGroupIds.has(row.reportingGroupId)) {
+      errors.push(`RPG cache contains inactive or unknown ReportingGroupID ${row.reportingGroupId}.`);
+    }
   }
-  if (groups.length !== 9) errors.push(`Active Reporting Groups are ${groups.length}; expected 9.`);
   if (rpgs.length !== scopes.length * groups.length) {
     errors.push(`Dense RPG rows are ${rpgs.length}; expected ${scopes.length * groups.length}.`);
+  }
+  for (const scope of scopes) {
+    for (const group of groups) {
+      const grain = `${scope.cacheVersion}|${scope.sourcePeriodKey}|${scope.restaurantId}|${group.reportingGroupId}`;
+      if (!rpgGrains.has(grain)) {
+        errors.push(`${scope.sourcePeriodKey}/${scope.restaurantId} is missing dense ReportingGroupID ${group.reportingGroupId}.`);
+      }
+    }
   }
   for (const period of periods) {
     const expected = {

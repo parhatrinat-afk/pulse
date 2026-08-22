@@ -30,10 +30,14 @@ For each selected RestaurantID and ReportingGroupID:
 - denominator: sum `tblWeeklyScopeCache[SourceSalesNOK]` for selected weeks;
 - share: numerator divided by denominator after aggregation.
 
-The implementation replaces only the current/comparison numerator and
-denominator component formulas. Existing share, selected-display, Total,
-Grand Total, sorting, detail and text-facade helpers remain in place. No weekly
-percentage is averaged.
+The implementation preserves the accepted share, selected-display, Total,
+Grand Total, sorting, detail and text-facade formulas. The current installer can
+regenerate those same helpers at the active Reporting Group count so capacity is
+not fixed at nine. No weekly percentage is averaged.
+
+Existing Reporting Group selections are preserved by stable ID. A newly active
+group defaults to `No` until the user includes it. Detail/sort validation lists,
+component ranges and visible matrix columns use deterministic active `SortOrder`.
 
 ## Validation and availability
 

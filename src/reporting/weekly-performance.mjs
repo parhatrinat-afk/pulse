@@ -1,7 +1,107 @@
 import { validateActiveWeeklyCacheFreshness } from "../imports/weekly-cache-activation.mjs";
 import { compareCandidateCacheRanges } from "../imports/weekly-compact-cache.mjs";
+import { planSelectionRows } from "./interactive-performance.mjs";
 
 export const WEEKLY_PERFORMANCE_CONTRACT_VERSION = "0.3.0-weekly-performance-v1";
+
+/**
+ * Validate and deterministically order the current active Reporting Group
+ * catalog. The weekly runtime is count-driven; nine groups are the accepted
+ * business state, not a capacity contract.
+ */
+export function activeWeeklyPerformanceReportingGroups(reportingGroups) {
+  if (!Array.isArray(reportingGroups)) {
+    throw new Error("Reporting Group catalog is missing.");
+  }
+  const catalogIds = new Set();
+  const activeNames = new Set();
+  const activeSortOrders = new Set();
+  const active = [];
+  for (const row of reportingGroups) {
+    const reportingGroupId = text(row.reportingGroupId ?? row.id);
+    if (!reportingGroupId) throw new Error("Reporting Group catalog contains a blank ReportingGroupID.");
+    if (catalogIds.has(reportingGroupId)) {
+      throw new Error(`Reporting Group catalog repeats ReportingGroupID ${reportingGroupId}.`);
+    }
+    catalogIds.add(reportingGroupId);
+    if (text(row.active ?? "Yes") !== "Yes") continue;
+    const sortOrder = Number(row.sortOrder);
+    if (!Number.isFinite(sortOrder)) {
+      throw new Error(`Active Reporting Group ${reportingGroupId} has an invalid SortOrder.`);
+    }
+    if (activeSortOrders.has(sortOrder)) {
+      throw new Error(`Active Reporting Groups repeat SortOrder ${sortOrder}.`);
+    }
+    const reportingGroupName = text(row.reportingGroupName ?? row.name) || reportingGroupId;
+    if (activeNames.has(reportingGroupName)) {
+      throw new Error(`Active Reporting Groups repeat business name ${reportingGroupName}.`);
+    }
+    activeNames.add(reportingGroupName);
+    activeSortOrders.add(sortOrder);
+    active.push({
+      reportingGroupId,
+      reportingGroupName,
+      sortOrder,
+    });
+  }
+  if (!active.length) throw new Error("At least one active Reporting Group is required.");
+  active.sort((left, right) => left.sortOrder - right.sortOrder ||
+    left.reportingGroupId.localeCompare(right.reportingGroupId));
+  return active;
+}
+
+export function planWeeklyPerformanceRpgSelection({
+  reportingGroups,
+  priorRows = [],
+  priorCatalogExists = false,
+}) {
+  const groups = activeWeeklyPerformanceReportingGroups(reportingGroups);
+  return planSelectionRows({
+    eligibleItems: groups.map(row => ({
+      id: row.reportingGroupId,
+      name: row.reportingGroupName,
+    })),
+    priorRows,
+    priorCatalogExists,
+  });
+}
+
+export function buildWeeklyPerformanceLayout({
+  reportingGroups,
+  restaurantCapacity,
+}) {
+  const groups = activeWeeklyPerformanceReportingGroups(reportingGroups);
+  const restaurants = Number(restaurantCapacity);
+  if (!Number.isInteger(restaurants) || restaurants < 1) {
+    throw new Error("Weekly Performance requires a positive restaurant capacity.");
+  }
+  const groupCapacity = groups.length;
+  const componentStartColumn = 39;
+  const componentBlocks = [];
+  for (let index = 0; index < 6; index += 1) {
+    componentBlocks.push(componentStartColumn + index * (groupCapacity + 1));
+  }
+  const numericDisplayStartColumn = componentBlocks[componentBlocks.length - 1] + groupCapacity + 1;
+  const totalComponentStartColumn = numericDisplayStartColumn + groupCapacity + 1;
+  const totalDisplayColumn = totalComponentStartColumn + 4;
+  const sortKeyColumn = totalDisplayColumn + 1;
+  const sortedRestaurantIdColumn = sortKeyColumn + 1;
+  const periodKeyStartColumn = sortedRestaurantIdColumn + 2;
+  return {
+    restaurantCapacity: restaurants,
+    groupCapacity,
+    componentBlocks,
+    numericDisplayStartColumn,
+    totalComponentStartColumn,
+    totalDisplayColumn,
+    sortKeyColumn,
+    sortedRestaurantIdColumn,
+    helperLastColumn: periodKeyStartColumn + 1,
+    periodKeyStartColumn,
+    matrixEndColumn: groupCapacity + 1,
+    componentTotalRow: restaurants + 1,
+  };
+}
 
 /**
  * Validate one inclusive ISO-week range against the active cache manifest.
@@ -115,4 +215,8 @@ function padWeek(value) {
 
 function blocked(status, summary, availableWeeks, expectedWeeks) {
   return { status, available: false, summary, availableWeeks, expectedWeeks };
+}
+
+function text(value) {
+  return String(value === null || value === undefined ? "" : value).trim();
 }

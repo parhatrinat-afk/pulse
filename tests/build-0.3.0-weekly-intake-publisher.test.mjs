@@ -64,6 +64,34 @@ test("dynamic intake contract prepares a complete deterministic Candidate for on
   assert.deepEqual(active, activeBefore, "publisher must not mutate the Active cache");
 });
 
+test("new-week publication is dense and reconciled with ten active Reporting Groups", () => {
+  const catalog = fixtureCatalog();
+  catalog.reportingGroups.push({
+    reportingGroupId: "RPG-0010", reportingGroupName: "Kids Menu",
+    active: "Yes", sortOrder: 100,
+  });
+  const active = buildActiveCache([
+    report(2026, 1, [sourceRow("Known Product", 1, 100)]),
+  ], catalog);
+  const result = publish({
+    active, catalog,
+    parsedReport: report(2026, 2, [sourceRow("Known Product", 2, 200)]),
+  });
+  const emptyGroupRows = result.candidate.weeklyRpgCacheRows
+    .filter(row => row.reportingGroupId === "RPG-0010");
+
+  assert.equal(result.outcome, "New");
+  assert.equal(result.candidate.periodManifest.length, 2);
+  assert.equal(result.candidate.scopeCacheRows.length, 2);
+  assert.equal(result.candidate.weeklyRpgCacheRows.length, 20);
+  assert.equal(emptyGroupRows.length, 2);
+  assert.ok(emptyGroupRows.every(row => row.mappedFactCount === 0 && row.mappedSalesNok === 0));
+  assert.deepEqual(result.candidate.validation.sourceTotals, {
+    factCount: 2, salesNok: 300, quantity: 3,
+  });
+  assert.equal(result.candidate.validation.status, "PASS");
+});
+
 test("same period/content is Duplicate and changed content is Correction Review", () => {
   const catalog = fixtureCatalog();
   const original = report(2026, 1, [sourceRow("Known Product", 1, 100)], "original.xlsx");

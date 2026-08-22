@@ -373,16 +373,34 @@ function validateMappingInput({ catalogs, expectedMappingContentFingerprint }) {
   }
 }
 
-function activeReportingGroups(groups) {
+export function activeReportingGroups(groups) {
   if (!Array.isArray(groups)) fail("PUL-030C-014", "Reporting Group catalog is missing.");
-  const active = groups.filter(row => String(row.active) === "Yes").map(row => ({
-    reportingGroupId: requiredText(row.reportingGroupId, "ReportingGroupID"),
-    reportingGroupName: String(row.reportingGroupName ?? ""),
-    sortOrder: Number(row.sortOrder),
-  }));
-  uniqueIndex(active, row => row.reportingGroupId, "active ReportingGroupID");
-  if (active.length !== 9) {
-    fail("PUL-030C-015", `Candidate weekly cache requires the accepted nine active Reporting Groups; found ${active.length}.`);
+  const catalogIds = new Set();
+  const activeSortOrders = new Set();
+  const active = [];
+  for (const row of groups) {
+    const reportingGroupId = requiredText(row.reportingGroupId, "ReportingGroupID");
+    if (catalogIds.has(reportingGroupId)) {
+      fail("PUL-030C-015", `Reporting Group catalog repeats ReportingGroupID ${reportingGroupId}.`);
+    }
+    catalogIds.add(reportingGroupId);
+    if (String(row.active) !== "Yes") continue;
+    const sortOrder = Number(row.sortOrder);
+    if (!Number.isFinite(sortOrder)) {
+      fail("PUL-030C-015", `Active Reporting Group ${reportingGroupId} has an invalid SortOrder.`);
+    }
+    if (activeSortOrders.has(sortOrder)) {
+      fail("PUL-030C-015", `Active Reporting Groups repeat SortOrder ${sortOrder}.`);
+    }
+    activeSortOrders.add(sortOrder);
+    active.push({
+      reportingGroupId,
+      reportingGroupName: String(row.reportingGroupName ?? ""),
+      sortOrder,
+    });
+  }
+  if (!active.length) {
+    fail("PUL-030C-015", "Candidate weekly cache requires at least one active Reporting Group.");
   }
   return active.sort((left, right) => left.sortOrder - right.sortOrder ||
     compareText(left.reportingGroupId, right.reportingGroupId));
@@ -533,6 +551,31 @@ function validateCandidateCacheRows({
     row.restaurantId,
     row.reportingGroupId,
   ]), "weekly RPG cache", errors);
+  const activeGroupIds = new Set(activeGroups.map(row => row.reportingGroupId));
+  const rpgGrains = new Set(weeklyRpgCacheRows.map(row => grainKey([
+    row.cacheVersion,
+    row.sourcePeriodKey,
+    row.restaurantId,
+    row.reportingGroupId,
+  ])));
+  for (const row of weeklyRpgCacheRows) {
+    if (!activeGroupIds.has(row.reportingGroupId)) {
+      errors.push(`Weekly RPG cache contains inactive or unknown ReportingGroupID ${row.reportingGroupId}.`);
+    }
+  }
+  for (const scopeRow of scopeCacheRows) {
+    for (const group of activeGroups) {
+      const expectedGrain = grainKey([
+        scopeRow.cacheVersion,
+        scopeRow.sourcePeriodKey,
+        scopeRow.restaurantId,
+        group.reportingGroupId,
+      ]);
+      if (!rpgGrains.has(expectedGrain)) {
+        errors.push(`${scopeRow.sourcePeriodKey}/${scopeRow.restaurantId} is missing dense ReportingGroupID ${group.reportingGroupId}.`);
+      }
+    }
+  }
   const expectedDenseRows = scopeCacheRows.length * activeGroups.length;
   if (weeklyRpgCacheRows.length !== expectedDenseRows) {
     errors.push(`Dense RPG row count is ${weeklyRpgCacheRows.length}; expected ${expectedDenseRows}.`);

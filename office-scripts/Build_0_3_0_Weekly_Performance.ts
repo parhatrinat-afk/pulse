@@ -10,6 +10,7 @@ function main(workbook: ExcelScript.Workbook): string {
   const periodTable = requiredTable(workbook, "tblWeeklyPeriodManifest");
   const scopeTable = requiredTable(workbook, "tblWeeklyScopeCache");
   const rpgTable = requiredTable(workbook, "tblWeeklyRPGCache");
+  const groupsTable = requiredTable(workbook, "tblReportingGroups");
   const restaurantTable = requiredTable(workbook, "tblRestaurants");
   const interactionQa = requiredTable(workbook, "tblPerformanceInteractionQA");
   const performance = requiredSheet(workbook, "Performance");
@@ -21,8 +22,10 @@ function main(workbook: ExcelScript.Workbook): string {
   const periodRows = tableRows(periodTable);
   const scopeRows = tableRows(scopeTable);
   const rpgRows = tableRows(rpgTable);
+  const activeGroups = readActiveReportingGroups(groupsTable);
   const authority = validateActiveCache(
-    versionTable, versionRows, periodTable, periodRows, scopeRows, rpgRows
+    versionTable, versionRows, periodTable, periodRows, scopeTable, scopeRows,
+    rpgTable, rpgRows, activeGroups
   );
   const live = validateLiveState(workbook);
   if (live.mappingContentFingerprint !== authority.mappingContentFingerprint ||
@@ -36,20 +39,31 @@ function main(workbook: ExcelScript.Workbook): string {
   const protectedBefore = protectedFingerprint(workbook);
   const currentValues = performance.getRange("B10:B12").getValues();
   const comparisonValues = performance.getRange("G10:G12").getValues();
+  const priorGroups = capturePriorGroupState(workbook, calc, performance);
+  const plannedGroups = planGroupSelection(activeGroups, priorGroups);
+  const layout = makeLayout(activeGroups.length, RESTAURANT_CAPACITY);
+  const priorLayout = makeLayout(Math.max(1, priorGroups.capacity), RESTAURANT_CAPACITY);
   const alreadyWeekly = text(performance.getRange("A10").getValue()) === "Year" &&
     text(performance.getRange("F10").getValue()) === "Year";
 
-  const yearSource = writeValidationLists(performance, periodRows, authority.cacheVersion);
-  writePeriodControls(performance, alreadyWeekly, currentValues, comparisonValues, yearSource);
-  writeWeeklyControl(calc, authority, live);
-  writePeriodKeyHelpers(calc);
-  writeWeeklyComponentFormulas(calc);
+  const validationSources = writeValidationLists(
+    performance, periodRows, authority.cacheVersion, activeGroups, priorGroups.capacity, layout
+  );
+  writeGroupSelectionTable(workbook, plannedGroups);
+  writePeriodControls(
+    performance, alreadyWeekly, currentValues, comparisonValues,
+    validationSources.yearSource, validationSources.weekSource
+  );
+  writeGroupControls(performance, activeGroups, priorGroups, layout, validationSources);
+  writeWeeklyRuntimeCalc(calc, authority, live, activeGroups, layout, priorLayout);
+  writeDetailFormulas(performance, layout);
+  writeDynamicMatrix(performance, layout, priorLayout);
   writeReportsPeriodLinks(reports);
   workbook.getApplication().setCalculationMode(ExcelScript.CalculationMode.automatic);
   workbook.getApplication().calculate(ExcelScript.CalculationType.full);
 
-  validateInstalledState(performance, reports, calc);
-  writeWeeklyPerformanceQA(workbook, qaSheet, live, authority);
+  validateInstalledState(workbook, performance, reports, calc, activeGroups, plannedGroups, layout);
+  writeWeeklyPerformanceQA(workbook, qaSheet, live, authority, activeGroups.length);
   const protectedAfter = protectedFingerprint(workbook);
   if (protectedBefore !== protectedAfter) {
     throw new Error("PUL-030P-002: A protected source, mapping, legacy result, import, or selection table changed.");
@@ -63,6 +77,7 @@ function main(workbook: ExcelScript.Workbook): string {
     cacheFreshness: calc.getRange("AL16").getText(),
     currentPeriodState: calc.getRange("AL17").getText(),
     comparisonPeriodState: calc.getRange("AL18").getText(),
+    activeReportingGroups: activeGroups.length,
     phase2C: `${live.phase2CPassCount}/16 PASS`,
     authority: "Active weekly cache",
     legacyMetricResults: "Retained for rollback"
@@ -86,18 +101,139 @@ type ActiveCacheAuthority = {
   performanceRestaurantScopeFingerprint: string;
 };
 
+type ReportingGroup = { id: string; name: string; sortOrder: number };
+type GroupSelectionRow = { id: string; name: string; include: string };
+type PriorGroupState = {
+  exists: boolean; capacity: number; includeById: { [key: string]: string };
+  detailGroupId: string; sortGroupId: string;
+};
+type RuntimeLayout = {
+  restaurantCapacity: number; groupCapacity: number; componentStarts: number[];
+  numericDisplayStart: number; totalComponentStart: number; totalDisplayColumn: number;
+  sortKeyColumn: number; sortedRestaurantIdColumn: number; helperLastColumn: number;
+  componentTotalRow: number; periodKeyStartColumn: number; matrixEndColumn: number;
+  performanceHelperStartColumn: number;
+};
+type ValidationSources = {
+  yearSource: ExcelScript.Range; weekSource: ExcelScript.Range;
+  detailGroupSource: ExcelScript.Range;
+  sortSource: ExcelScript.Range;
+};
+
 const RESTAURANT_CAPACITY = 16;
-const GROUP_CAPACITY = 9;
-const CURRENT_PERIOD_KEYS = "$DN$2:$DN$54";
-const COMPARISON_PERIOD_KEYS = "$DO$2:$DO$54";
+const DASH = "—";
+
+function readActiveReportingGroups(table: ExcelScript.Table): ReportingGroup[] {
+  const h = headerMap(table);
+  const rows = tableRows(table);
+  const catalogIds: { [key: string]: boolean } = {};
+  const activeNames: { [key: string]: boolean } = {};
+  const activeSortOrders: { [key: string]: boolean } = {};
+  const active: ReportingGroup[] = [];
+  for (const row of rows) {
+    const id = text(row[h.ReportingGroupID]);
+    if (!id) throw new Error("PUL-030P-016: Reporting Group catalog contains a blank ReportingGroupID.");
+    if (catalogIds[id]) throw new Error(`PUL-030P-016: Reporting Group catalog repeats ${id}.`);
+    catalogIds[id] = true;
+    if (text(row[h.Active]) !== "Yes") continue;
+    const name = text(row[h.ReportingGroupName]);
+    const sortOrder = Number(row[h.SortOrder]);
+    if (!name) throw new Error(`PUL-030P-016: Active Reporting Group ${id} has a blank business name.`);
+    if (activeNames[name]) throw new Error(`PUL-030P-016: Active Reporting Groups repeat business name ${name}.`);
+    if (!Number.isFinite(sortOrder)) throw new Error(`PUL-030P-016: Active Reporting Group ${id} has an invalid SortOrder.`);
+    const sortKey = String(sortOrder);
+    if (activeSortOrders[sortKey]) throw new Error(`PUL-030P-016: Active Reporting Groups repeat SortOrder ${sortKey}.`);
+    activeNames[name] = true;
+    activeSortOrders[sortKey] = true;
+    active.push({ id, name, sortOrder });
+  }
+  if (active.length < 1) throw new Error("PUL-030P-016: At least one active Reporting Group is required.");
+  active.sort((left, right) => left.sortOrder - right.sortOrder || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+  return active;
+}
+
+function capturePriorGroupState(
+  workbook: ExcelScript.Workbook,
+  calc: ExcelScript.Worksheet,
+  performance: ExcelScript.Worksheet
+): PriorGroupState {
+  const table = workbook.getTable("tblPerformanceRPGSelection");
+  const includeById: { [key: string]: string } = {};
+  let capacity = 0;
+  if (table) {
+    const h = headerMap(table);
+    const rows = tableRows(table);
+    capacity = rows.length;
+    for (const row of rows) {
+      const id = text(row[h.ReportingGroupID]);
+      if (!id) throw new Error("PUL-030P-017: Existing Reporting Group selection contains a blank ID.");
+      if (includeById[id] !== undefined) throw new Error(`PUL-030P-017: Existing Reporting Group selection repeats ${id}.`);
+      includeById[id] = text(row[h.Include]) === "Yes" ? "Yes" : "No";
+    }
+  }
+  return {
+    exists: !!table,
+    capacity,
+    includeById,
+    detailGroupId: text(calc.getRange("AL6").getValue()),
+    sortGroupId: text(calc.getRange("AL12").getValue()) || text(performance.getRange("I6").getValue())
+  };
+}
+
+function planGroupSelection(groups: ReportingGroup[], prior: PriorGroupState): GroupSelectionRow[] {
+  const output: GroupSelectionRow[] = [];
+  for (const group of groups) {
+    output.push({
+      id: group.id,
+      name: group.name,
+      include: prior.includeById[group.id] !== undefined
+        ? prior.includeById[group.id]
+        : prior.exists ? "No" : "Yes"
+    });
+  }
+  return output;
+}
+
+function makeLayout(groupCapacity: number, restaurantCapacity: number): RuntimeLayout {
+  if (groupCapacity < 1 || restaurantCapacity < 1) {
+    throw new Error("PUL-030P-018: Weekly Performance capacities must be positive.");
+  }
+  const componentStarts: number[] = [];
+  for (let index = 0; index < 6; index += 1) componentStarts.push(39 + index * (groupCapacity + 1));
+  const numericDisplayStart = componentStarts[5] + groupCapacity + 1;
+  const totalComponentStart = numericDisplayStart + groupCapacity + 1;
+  const totalDisplayColumn = totalComponentStart + 4;
+  const sortKeyColumn = totalDisplayColumn + 1;
+  const sortedRestaurantIdColumn = sortKeyColumn + 1;
+  const periodKeyStartColumn = sortedRestaurantIdColumn + 2;
+  const matrixEndColumn = groupCapacity + 1;
+  return {
+    restaurantCapacity,
+    groupCapacity,
+    componentStarts,
+    numericDisplayStart,
+    totalComponentStart,
+    totalDisplayColumn,
+    sortKeyColumn,
+    sortedRestaurantIdColumn,
+    helperLastColumn: periodKeyStartColumn + 1,
+    componentTotalRow: restaurantCapacity + 1,
+    periodKeyStartColumn,
+    matrixEndColumn,
+    performanceHelperStartColumn: Math.max(21, matrixEndColumn + 2)
+  };
+}
 
 function validateActiveCache(
   versionTable: ExcelScript.Table,
   versionRows: CellValue[][],
   periodTable: ExcelScript.Table,
   periodRows: CellValue[][],
+  scopeTable: ExcelScript.Table,
   scopeRows: CellValue[][],
-  rpgRows: CellValue[][]
+  rpgTable: ExcelScript.Table,
+  rpgRows: CellValue[][],
+  activeGroups: ReportingGroup[]
 ): ActiveCacheAuthority {
   const vh = headerMap(versionTable);
   const activeRows: CellValue[][] = [];
@@ -132,9 +268,11 @@ function validateActiveCache(
     if (!item[1]) throw new Error(`PUL-030P-004: Active cache ${item[0]} is blank.`);
   }
   const ph = headerMap(periodTable);
+  const sh = headerMap(scopeTable);
+  const rh = headerMap(rpgTable);
   const activePeriods = periodRows.filter(value => text(value[ph.CacheVersion]) === authority.cacheVersion);
-  const activeScopes = scopeRows.filter(value => text(value[1]) === authority.cacheVersion);
-  const activeRpgs = rpgRows.filter(value => text(value[1]) === authority.cacheVersion);
+  const activeScopes = scopeRows.filter(value => text(value[sh.CacheVersion]) === authority.cacheVersion);
+  const activeRpgs = rpgRows.filter(value => text(value[rh.CacheVersion]) === authority.cacheVersion);
   if (activePeriods.length !== number(row[vh.PeriodRowCount]) ||
       activeScopes.length !== number(row[vh.ScopeCacheRowCount]) ||
       activeRpgs.length !== number(row[vh.DenseRPGCacheRowCount])) {
@@ -146,6 +284,26 @@ function validateActiveCache(
     if (seen[key]) throw new Error(`PUL-030P-005: Duplicate manifest ISO period ${key}.`);
     seen[key] = true;
   }
+  const groupIds: { [key: string]: boolean } = {};
+  for (const group of activeGroups) groupIds[group.id] = true;
+  const rpgGrains: { [key: string]: boolean } = {};
+  for (const rowValue of activeRpgs) {
+    const groupId = text(rowValue[rh.ReportingGroupID]);
+    if (!groupIds[groupId]) throw new Error(`PUL-030P-005: Active cache contains unavailable ReportingGroupID ${groupId}.`);
+    const grain = `${text(rowValue[rh.SourcePeriodKey])}|${text(rowValue[rh.RestaurantID])}|${groupId}`;
+    if (rpgGrains[grain]) throw new Error(`PUL-030P-005: Active cache repeats RPG grain ${grain}.`);
+    rpgGrains[grain] = true;
+  }
+  const expectedDenseRows = activeScopes.length * activeGroups.length;
+  if (activeRpgs.length !== expectedDenseRows) {
+    throw new Error(`PUL-030P-005: Active cache has ${activeRpgs.length} dense RPG rows; expected ${expectedDenseRows}.`);
+  }
+  for (const scope of activeScopes) {
+    for (const group of activeGroups) {
+      const grain = `${text(scope[sh.SourcePeriodKey])}|${text(scope[sh.RestaurantID])}|${group.id}`;
+      if (!rpgGrains[grain]) throw new Error(`PUL-030P-005: Active cache is missing dense RPG grain ${grain}.`);
+    }
+  }
   return authority;
 }
 
@@ -156,7 +314,7 @@ function validatePhase2CLayout(
   qaTable: ExcelScript.Table
 ): void {
   if (tableRows(requiredTable(workbook, "tblPerformanceRestaurantSelection")).length !== RESTAURANT_CAPACITY ||
-      tableRows(requiredTable(workbook, "tblPerformanceRPGSelection")).length !== GROUP_CAPACITY ||
+      tableRows(requiredTable(workbook, "tblPerformanceRPGSelection")).length < 1 ||
       calc.getRange("AE1:DL1").getTexts()[0].join("|").indexOf("Current Numerator") < 0) {
     throw new Error("PUL-030P-006: Accepted Phase 2C helper/selection layout is missing.");
   }
@@ -168,8 +326,11 @@ function validatePhase2CLayout(
 function writeValidationLists(
   performance: ExcelScript.Worksheet,
   periodRows: CellValue[][],
-  activeCacheVersion: string
-): ExcelScript.Range {
+  activeCacheVersion: string,
+  groups: ReportingGroup[],
+  priorGroupCapacity: number,
+  layout: RuntimeLayout
+): ValidationSources {
   const years: number[] = [];
   const seenYears: { [key: string]: boolean } = {};
   for (const row of periodRows) {
@@ -182,12 +343,25 @@ function writeValidationLists(
   for (const year of years) yearValues.push([year]);
   const weekValues: (string | number | boolean)[][] = [];
   for (let week = 1; week <= 53; week += 1) weekValues.push([`W${String(week).padStart(2, "0")}`]);
-  performance.getRange("V1:W54").clear(ExcelScript.ClearApplyTo.contents);
-  performance.getRange("V1:W1").setValues([["Available year", "ISO week"]]);
-  performance.getRangeByIndexes(1, 21, yearValues.length, 1).setValues(yearValues);
-  performance.getRange("W2:W54").setValues(weekValues);
-  performance.getRange("V:W").setColumnHidden(true);
-  return performance.getRangeByIndexes(1, 21, yearValues.length, 1);
+  const start = layout.performanceHelperStartColumn;
+  const priorRows = Math.max(54, priorGroupCapacity + 2, groups.length + 2);
+  performance.getRangeByIndexes(0, start, priorRows, 4).clear(ExcelScript.ClearApplyTo.contents);
+  performance.getRangeByIndexes(0, start, 1, 4).setValues([[
+    "Available year", "ISO week", "Detail Reporting Group", "Sort target"
+  ]]);
+  performance.getRangeByIndexes(1, start, yearValues.length, 1).setValues(yearValues);
+  performance.getRangeByIndexes(1, start + 1, weekValues.length, 1).setValues(weekValues);
+  performance.getRangeByIndexes(1, start + 2, groups.length, 1)
+    .setValues(groups.map(group => [group.name]));
+  performance.getRangeByIndexes(1, start + 3, groups.length + 1, 1)
+    .setValues([["Total"]].concat(groups.map(group => [group.name])));
+  performance.getRangeByIndexes(0, start, 1, 4).getEntireColumn().setColumnHidden(true);
+  return {
+    yearSource: performance.getRangeByIndexes(1, start, yearValues.length, 1),
+    weekSource: performance.getRangeByIndexes(1, start + 1, weekValues.length, 1),
+    detailGroupSource: performance.getRangeByIndexes(1, start + 2, groups.length, 1),
+    sortSource: performance.getRangeByIndexes(1, start + 3, groups.length + 1, 1)
+  };
 }
 
 function writePeriodControls(
@@ -195,7 +369,8 @@ function writePeriodControls(
   alreadyWeekly: boolean,
   priorCurrent: CellValue[][],
   priorComparison: CellValue[][],
-  yearSource: ExcelScript.Range
+  yearSource: ExcelScript.Range,
+  weekSource: ExcelScript.Range
 ): void {
   performance.getRange("A9:D13").clear(ExcelScript.ClearApplyTo.contents);
   performance.getRange("F9:I13").clear(ExcelScript.ClearApplyTo.contents);
@@ -225,7 +400,6 @@ function writePeriodControls(
   performance.getRange("G13:I13").getFormat().getFill().setColor("#EAF2FF");
   applyRangeValidation(performance.getRange("B10"), yearSource);
   applyRangeValidation(performance.getRange("G10"), yearSource);
-  const weekSource = performance.getRange("W2:W54");
   applyRangeValidation(performance.getRange("B11"), weekSource);
   applyRangeValidation(performance.getRange("B12"), weekSource);
   applyRangeValidation(performance.getRange("G11"), weekSource);
@@ -240,12 +414,119 @@ function writePeriodControls(
   performance.getRange("G18").setFormula("=_Metric_Calc!$AL$23");
 }
 
+function writeGroupSelectionTable(workbook: ExcelScript.Workbook, rows: GroupSelectionRow[]): void {
+  const table = requiredTable(workbook, "tblPerformanceRPGSelection");
+  const sheet = table.getWorksheet();
+  const oldRange = table.getRange();
+  const startRow = oldRange.getRowIndex();
+  const startColumn = oldRange.getColumnIndex();
+  const oldRowCount = oldRange.getRowCount();
+  const target = sheet.getRangeByIndexes(startRow, startColumn, rows.length + 1, 3);
+  table.resize(target);
+  table.getHeaderRowRange().setValues([["Include", "Reporting Group", "ReportingGroupID"]]);
+  table.getRangeBetweenHeaderAndTotal().setValues(rows.map(row => [row.include, row.name, row.id]));
+  if (oldRowCount > rows.length + 1) {
+    sheet.getRangeByIndexes(startRow + rows.length + 1, startColumn, oldRowCount - rows.length - 1, 3)
+      .clear(ExcelScript.ClearApplyTo.contents);
+  }
+  const include = table.getColumnByName("Include");
+  if (!include) throw new Error("PUL-030P-019: Reporting Group selection Include column is missing.");
+  const validation = include.getRangeBetweenHeaderAndTotal().getDataValidation();
+  validation.clear();
+  validation.setRule({ list: { inCellDropDown: true, source: "Yes,No" } });
+  validation.setErrorAlert({ showAlert: true, style: ExcelScript.DataValidationAlertStyle.stop,
+    title: "Choose Yes or No", message: "Use Yes to include this Reporting Group in Performance." });
+}
+
+function writeGroupControls(
+  performance: ExcelScript.Worksheet,
+  groups: ReportingGroup[],
+  prior: PriorGroupState,
+  layout: RuntimeLayout,
+  sources: ValidationSources
+): void {
+  const detail = groups.find(group => group.id === prior.detailGroupId || group.name === prior.detailGroupId) || groups[0];
+  const sort = groups.find(group => group.id === prior.sortGroupId || group.name === prior.sortGroupId);
+  performance.getRange("B7").setValue(detail.name);
+  performance.getRange("I6").setValue(sort ? sort.name : "Total");
+  applyRangeValidation(performance.getRange("B7"), sources.detailGroupSource);
+  applyRangeValidation(performance.getRange("I6"), sources.sortSource);
+  performance.getRange("G8").setFormula(
+    `=IF('_Metric_Calc'!$AL$5=${layout.groupCapacity},"All ${layout.groupCapacity} Reporting Groups selected",` +
+      `'_Metric_Calc'!$AL$5&" of ${layout.groupCapacity} Reporting Groups selected")`
+  );
+  performance.getRange("I8").setFormula("='_Metric_Calc'!$AL$15");
+}
+
+function writeWeeklyRuntimeCalc(
+  calc: ExcelScript.Worksheet,
+  authority: ActiveCacheAuthority,
+  live: LiveState,
+  groups: ReportingGroup[],
+  layout: RuntimeLayout,
+  priorLayout: RuntimeLayout
+): void {
+  const clearLastColumn = Math.max(layout.helperLastColumn, priorLayout.helperLastColumn);
+  calc.getRangeByIndexes(0, 30, 54, clearLastColumn - 30 + 1).clear(ExcelScript.ClearApplyTo.all);
+  const groupClearRows = Math.max(layout.groupCapacity, priorLayout.groupCapacity) + 1;
+  calc.getRangeByIndexes(0, 8, groupClearRows, 2).clear(ExcelScript.ClearApplyTo.contents);
+  calc.getRange("I1:J1").setValues([["Reporting Group", "ReportingGroupID"]]);
+  calc.getRangeByIndexes(1, 8, groups.length, 2).setValues(groups.map(group => [group.name, group.id]));
+
+  calc.getRange("AE1:AF1").setValues([["Selected Restaurant", "Selected RestaurantID"]]);
+  const selectedRestaurantFormulas: string[][] = [];
+  for (let index = 0; index < layout.restaurantCapacity; index += 1) {
+    const excelRow = index + 2;
+    selectedRestaurantFormulas.push([
+      `=IFERROR(INDEX(FILTER(tblPerformanceRestaurantSelection[Restaurant],tblPerformanceRestaurantSelection[Include]="Yes"),ROWS($AE$2:AE${excelRow})),"")`,
+      `=IFERROR(INDEX(FILTER(tblPerformanceRestaurantSelection[RestaurantID],tblPerformanceRestaurantSelection[Include]="Yes"),ROWS($AF$2:AF${excelRow})),"")`
+    ]);
+  }
+  calc.getRangeByIndexes(1, 30, layout.restaurantCapacity, 2).setFormulas(selectedRestaurantFormulas);
+
+  calc.getRange("AH1:AI1").setValues([["Selected Reporting Group", "Selected ReportingGroupID"]]);
+  const selectedGroupFormulas: string[][] = [];
+  for (let index = 0; index < layout.groupCapacity; index += 1) {
+    const excelRow = index + 2;
+    selectedGroupFormulas.push([
+      `=IFERROR(INDEX(FILTER(tblPerformanceRPGSelection[Reporting Group],tblPerformanceRPGSelection[Include]="Yes"),ROWS($AH$2:AH${excelRow})),"")`,
+      `=IFERROR(INDEX(FILTER(tblPerformanceRPGSelection[ReportingGroupID],tblPerformanceRPGSelection[Include]="Yes"),ROWS($AI$2:AI${excelRow})),"")`
+    ]);
+  }
+  calc.getRangeByIndexes(1, 33, layout.groupCapacity, 2).setFormulas(selectedGroupFormulas);
+
+  writeWeeklyControl(calc, authority, live, layout);
+  writePeriodKeyHelpers(calc, layout);
+  writeRuntimeHeaders(calc, groups, layout);
+  writeWeeklyComponentBlock(calc, layout, 0, true, true);
+  writeWeeklyComponentBlock(calc, layout, 1, true, false);
+  writeShareBlock(calc, layout, 2, 0, 1);
+  writeWeeklyComponentBlock(calc, layout, 3, false, true);
+  writeWeeklyComponentBlock(calc, layout, 4, false, false);
+  writeShareBlock(calc, layout, 5, 3, 4);
+  writeNumericDisplayBlock(calc, layout);
+  writeTotalAndSortHelpers(calc, layout);
+
+  calc.getRangeByIndexes(1, layout.componentStarts[0], layout.restaurantCapacity + 1, layout.groupCapacity)
+    .setNumberFormat('#,##0.00 "NOK"');
+  calc.getRangeByIndexes(1, layout.componentStarts[1], layout.restaurantCapacity + 1, layout.groupCapacity)
+    .setNumberFormat('#,##0.00 "NOK"');
+  calc.getRangeByIndexes(1, layout.componentStarts[2], layout.restaurantCapacity + 1, layout.groupCapacity)
+    .setNumberFormat("0.00%");
+  calc.getRangeByIndexes(1, layout.componentStarts[3], layout.restaurantCapacity + 1, layout.groupCapacity)
+    .setNumberFormat('#,##0.00 "NOK"');
+  calc.getRangeByIndexes(1, layout.componentStarts[4], layout.restaurantCapacity + 1, layout.groupCapacity)
+    .setNumberFormat('#,##0.00 "NOK"');
+  calc.getRangeByIndexes(1, layout.componentStarts[5], layout.restaurantCapacity + 1, layout.groupCapacity)
+    .setNumberFormat("0.00%");
+}
+
 function writeWeeklyControl(
   calc: ExcelScript.Worksheet,
   authority: ActiveCacheAuthority,
-  live: LiveState
+  live: LiveState,
+  layout: RuntimeLayout
 ): void {
-  calc.getRange("AK1:AL30").clear(ExcelScript.ClearApplyTo.contents);
   calc.getRange("AK1:AL30").setValues([
     ["Weekly Performance control", "Value"],
     ["Current period", ""], ["Comparison period", ""],
@@ -253,7 +534,7 @@ function writeWeeklyControl(
     ["Detail ReportingGroupID", ""], ["Matrix display", ""],
     ["Company scope fingerprint", authority.performanceRestaurantScopeFingerprint],
     ["Interaction contract", "Weekly cache additive components only"],
-    ["Restaurant capacity", RESTAURANT_CAPACITY], ["RPG capacity", GROUP_CAPACITY],
+    ["Restaurant capacity", layout.restaurantCapacity], ["RPG capacity", layout.groupCapacity],
     ["Requested sort ReportingGroupID", ""], ["Effective sort ReportingGroupID", ""],
     ["Sort order", ""], ["Sort status", ""],
     ["Active-cache freshness", ""], ["Current period state", ""],
@@ -267,14 +548,15 @@ function writeWeeklyControl(
     ["Current ReportingEnabled fingerprint", live.performanceRestaurantScopeFingerprint],
     ["Accepted IdentityPreflightFingerprint", authority.identityPreflightFingerprint]
   ]);
+  const groupEnd = layout.groupCapacity + 1;
   calc.getRange("AL2").setFormula("=Performance!$B$13");
   calc.getRange("AL3").setFormula("=Performance!$G$13");
   calc.getRange("AL4").setFormula('=COUNTIF(tblPerformanceRestaurantSelection[Include],"Yes")');
   calc.getRange("AL5").setFormula('=COUNTIF(tblPerformanceRPGSelection[Include],"Yes")');
-  calc.getRange("AL6").setFormula('=IFERROR(INDEX($J$2:$J$10,MATCH(Performance!$B$7,$I$2:$I$10,0)),"")');
+  calc.getRange("AL6").setFormula(`=IFERROR(INDEX($J$2:$J$${groupEnd},MATCH(Performance!$B$7,$I$2:$I$${groupEnd},0)),"")`);
   calc.getRange("AL7").setFormula("=Performance!$G$6");
-  calc.getRange("AL12").setFormula('=IF(Performance!$I$6="Total","",IFERROR(INDEX($J$2:$J$10,MATCH(Performance!$I$6,$I$2:$I$10,0)),""))');
-  calc.getRange("AL13").setFormula('=IF(OR($AL$12="",COUNTIF($AI$2:$AI$10,$AL$12)=0),"",$AL$12)');
+  calc.getRange("AL12").setFormula(`=IF(Performance!$I$6="Total","",IFERROR(INDEX($J$2:$J$${groupEnd},MATCH(Performance!$I$6,$I$2:$I$${groupEnd},0)),""))`);
+  calc.getRange("AL13").setFormula(`=IF(OR($AL$12="",COUNTIF($AI$2:$AI$${groupEnd},$AL$12)=0),"",$AL$12)`);
   calc.getRange("AL14").setFormula("=Performance!$I$7");
   calc.getRange("AL15").setFormula('=IF(Performance!$I$6="Total","",IF($AL$12="","Using Total — target unavailable",IF($AL$13="","Using Total — "&Performance!$I$6&" hidden","")))');
   calc.getRange("AL16").setFormula(cacheFreshnessFormula());
@@ -290,58 +572,311 @@ function writeWeeklyControl(
   calc.getRange("AL26").setFormula('=IFERROR(VALUE(RIGHT(Performance!$G$12,2))-VALUE(RIGHT(Performance!$G$11,2))+1,0)');
 }
 
-function writePeriodKeyHelpers(calc: ExcelScript.Worksheet): void {
-  calc.getRange("DN1:DO54").clear(ExcelScript.ClearApplyTo.contents);
-  calc.getRange("DN1:DO1").setValues([["Current SourcePeriodKey", "Comparison SourcePeriodKey"]]);
+function writePeriodKeyHelpers(calc: ExcelScript.Worksheet, layout: RuntimeLayout): void {
+  const currentColumn = columnName(layout.periodKeyStartColumn);
+  const comparisonColumn = columnName(layout.periodKeyStartColumn + 1);
+  calc.getRangeByIndexes(0, layout.periodKeyStartColumn, 1, 2)
+    .setValues([["Current SourcePeriodKey", "Comparison SourcePeriodKey"]]);
   const formulas: string[][] = [];
   for (let index = 0; index < 53; index += 1) {
     const row = index + 2;
     formulas.push([
-      periodKeyFormula(row, "$AL$17", "$AL$19", "Performance!$B$10", "Performance!$B$11", "Performance!$B$12", "DN"),
-      periodKeyFormula(row, "$AL$18", "$AL$20", "Performance!$G$10", "Performance!$G$11", "Performance!$G$12", "DO")
+      periodKeyFormula(row, "$AL$17", "$AL$19", "Performance!$B$10", "Performance!$B$11", "Performance!$B$12", currentColumn),
+      periodKeyFormula(row, "$AL$18", "$AL$20", "Performance!$G$10", "Performance!$G$11", "Performance!$G$12", comparisonColumn)
     ]);
   }
-  calc.getRange("DN2:DO54").setFormulas(formulas);
+  calc.getRangeByIndexes(1, layout.periodKeyStartColumn, 53, 2).setFormulas(formulas);
 }
 
-function writeWeeklyComponentFormulas(calc: ExcelScript.Worksheet): void {
-  writeWeeklyComponentBlock(calc, "AN", true, true);
-  writeWeeklyComponentBlock(calc, "AX", true, false);
-  writeWeeklyComponentBlock(calc, "BR", false, true);
-  writeWeeklyComponentBlock(calc, "CB", false, false);
+function writeRuntimeHeaders(calc: ExcelScript.Worksheet, groups: ReportingGroup[], layout: RuntimeLayout): void {
+  const names = ["Current Numerator", "Current Denominator", "Current Share", "Comparison Numerator", "Comparison Denominator", "Comparison Share"];
+  for (let index = 0; index < names.length; index += 1) {
+    calc.getRangeByIndexes(0, layout.componentStarts[index] - 1, 1, layout.groupCapacity + 1)
+      .setValues([[`${names[index]} | RPG-ID`].concat(groups.map(group => group.id))]);
+  }
+  calc.getRangeByIndexes(0, layout.numericDisplayStart - 1, 1, layout.groupCapacity + 1)
+    .setValues([["Selected Numeric Display | RPG-ID"].concat(groups.map(group => group.id))]);
+  calc.getRangeByIndexes(0, layout.totalComponentStart, 1, 7).setValues([[
+    "Selected RPG Current Numerator", "Current Scope Denominator",
+    "Selected RPG Comparison Numerator", "Comparison Scope Denominator",
+    "Selected RPG Total Numeric Display", "Restaurant Numeric Sort Key", "Sorted RestaurantID"
+  ]]);
 }
 
 function writeWeeklyComponentBlock(
   calc: ExcelScript.Worksheet,
-  startColumn: string,
+  layout: RuntimeLayout,
+  blockIndex: number,
   current: boolean,
   numerator: boolean
 ): void {
-  const startIndex = columnIndex(startColumn);
+  const startIndex = layout.componentStarts[blockIndex];
   const periodState = current ? "$AL$17" : "$AL$18";
-  const periodKeys = current ? CURRENT_PERIOD_KEYS : COMPARISON_PERIOD_KEYS;
+  const periodColumn = columnName(layout.periodKeyStartColumn + (current ? 0 : 1));
+  const periodKeys = `$${periodColumn}$2:$${periodColumn}$54`;
   const table = numerator ? "tblWeeklyRPGCache" : "tblWeeklyScopeCache";
   const value = numerator ? "MappedSalesNOK" : "SourceSalesNOK";
   const formulas: string[][] = [];
-  for (let restaurant = 0; restaurant < RESTAURANT_CAPACITY; restaurant += 1) {
+  for (let restaurant = 0; restaurant < layout.restaurantCapacity; restaurant += 1) {
     const excelRow = restaurant + 2;
-    const row: string[] = [];
-    for (let group = 0; group < GROUP_CAPACITY; group += 1) {
+    const formulaRow: string[] = [];
+    for (let group = 0; group < layout.groupCapacity; group += 1) {
       const groupRow = group + 2;
       let formula = `=IF(OR($AF${excelRow}="",$AL$16<>"Available",${periodState}<>"Valid"),0,IFERROR(SUM(SUMIFS(${table}[${value}],${table}[CacheVersion],$AL$24,${table}[RestaurantID],$AF${excelRow},`;
       if (numerator) formula += `${table}[ReportingGroupID],$J$${groupRow},`;
       formula += `${table}[SourcePeriodKey],FILTER(${periodKeys},${periodKeys}<>""))),0))`;
-      row.push(formula);
+      formulaRow.push(formula);
     }
-    formulas.push(row);
+    formulas.push(formulaRow);
   }
-  calc.getRangeByIndexes(1, startIndex, RESTAURANT_CAPACITY, GROUP_CAPACITY).setFormulas(formulas);
+  calc.getRangeByIndexes(1, startIndex, layout.restaurantCapacity, layout.groupCapacity).setFormulas(formulas);
   const totals: string[][] = [[]];
-  for (let group = 0; group < GROUP_CAPACITY; group += 1) {
+  for (let group = 0; group < layout.groupCapacity; group += 1) {
     const column = columnName(startIndex + group);
-    totals[0].push(`=SUM(${column}$2:${column}$17)`);
+    totals[0].push(`=SUM(${column}$2:${column}$${layout.restaurantCapacity + 1})`);
   }
-  calc.getRangeByIndexes(17, startIndex, 1, GROUP_CAPACITY).setFormulas(totals);
+  calc.getRangeByIndexes(layout.componentTotalRow, startIndex, 1, layout.groupCapacity).setFormulas(totals);
+}
+
+function writeShareBlock(
+  calc: ExcelScript.Worksheet,
+  layout: RuntimeLayout,
+  shareBlockIndex: number,
+  numeratorBlockIndex: number,
+  denominatorBlockIndex: number
+): void {
+  const formulas: string[][] = [];
+  for (let rowIndex = 0; rowIndex < layout.restaurantCapacity + 1; rowIndex += 1) {
+    const excelRow = rowIndex + 2;
+    const formulaRow: string[] = [];
+    for (let group = 0; group < layout.groupCapacity; group += 1) {
+      const numerator = componentCellReference(layout, numeratorBlockIndex, excelRow, group);
+      const denominator = componentCellReference(layout, denominatorBlockIndex, excelRow, group);
+      formulaRow.push(`=IF(${denominator}=0,0,${numerator}/${denominator})`);
+    }
+    formulas.push(formulaRow);
+  }
+  calc.getRangeByIndexes(1, layout.componentStarts[shareBlockIndex], layout.restaurantCapacity + 1, layout.groupCapacity)
+    .setFormulas(formulas);
+}
+
+function writeNumericDisplayBlock(calc: ExcelScript.Worksheet, layout: RuntimeLayout): void {
+  const formulas: string[][] = [];
+  for (let rowIndex = 0; rowIndex < layout.restaurantCapacity + 1; rowIndex += 1) {
+    const excelRow = rowIndex + 2;
+    const formulaRow: string[] = [];
+    for (let group = 0; group < layout.groupCapacity; group += 1) {
+      const currentNumerator = componentCellReference(layout, 0, excelRow, group);
+      const currentDenominator = componentCellReference(layout, 1, excelRow, group);
+      const currentShare = componentCellReference(layout, 2, excelRow, group);
+      const comparisonNumerator = componentCellReference(layout, 3, excelRow, group);
+      const comparisonDenominator = componentCellReference(layout, 4, excelRow, group);
+      const comparisonShare = componentCellReference(layout, 5, excelRow, group);
+      formulaRow.push(
+        `=IF($AL$7="Current Sales NOK",IF(${currentDenominator}=0,"",${currentNumerator}),` +
+          `IF($AL$7="Current Share",IF(${currentDenominator}=0,"",${currentShare}),` +
+          `IF($AL$7="Comparison Share",IF(${comparisonDenominator}=0,"",${comparisonShare}),` +
+          `IF($AL$7="PP Change",IF(OR(${currentDenominator}=0,${comparisonDenominator}=0),"",(${currentShare}-${comparisonShare})*100),` +
+          `IF($AL$7="NOK Impact",IF(OR(${currentDenominator}=0,${comparisonDenominator}=0),"",${currentNumerator}-((${comparisonNumerator}/${comparisonDenominator})*${currentDenominator})),"")))))`
+      );
+    }
+    formulas.push(formulaRow);
+  }
+  calc.getRangeByIndexes(1, layout.numericDisplayStart, layout.restaurantCapacity + 1, layout.groupCapacity)
+    .setFormulas(formulas);
+}
+
+function writeTotalAndSortHelpers(calc: ExcelScript.Worksheet, layout: RuntimeLayout): void {
+  const currentNumeratorColumn = columnName(layout.totalComponentStart);
+  const currentDenominatorColumn = columnName(layout.totalComponentStart + 1);
+  const comparisonNumeratorColumn = columnName(layout.totalComponentStart + 2);
+  const comparisonDenominatorColumn = columnName(layout.totalComponentStart + 3);
+  const totalDisplayColumn = columnName(layout.totalDisplayColumn);
+  const sortKeyColumn = columnName(layout.sortKeyColumn);
+  const sortedIdColumn = columnName(layout.sortedRestaurantIdColumn);
+  const formulas: string[][] = [];
+  for (let rowIndex = 0; rowIndex < layout.restaurantCapacity + 1; rowIndex += 1) {
+    const excelRow = rowIndex + 2;
+    const cn = `$${currentNumeratorColumn}${excelRow}`;
+    const cd = `$${currentDenominatorColumn}${excelRow}`;
+    const pn = `$${comparisonNumeratorColumn}${excelRow}`;
+    const pd = `$${comparisonDenominatorColumn}${excelRow}`;
+    formulas.push([
+      `=IF($AL$5=0,0,${selectedNumeratorExpression(layout, 0, excelRow)})`,
+      `=${componentCellReference(layout, 1, excelRow, 0)}`,
+      `=IF($AL$5=0,0,${selectedNumeratorExpression(layout, 3, excelRow)})`,
+      `=${componentCellReference(layout, 4, excelRow, 0)}`,
+      `=IF($AL$5=0,"",IF($AL$7="Current Sales NOK",${cn},IF($AL$7="Current Share",IF(${cd}=0,"",${cn}/${cd}),IF($AL$7="Comparison Share",IF(${pd}=0,"",${pn}/${pd}),IF($AL$7="PP Change",IF(OR(${cd}=0,${pd}=0),"",((${cn}/${cd})-(${pn}/${pd}))*100),IF($AL$7="NOK Impact",IF(OR(${cd}=0,${pd}=0),"",${cn}-((${pn}/${pd})*${cd})),""))))))`
+    ]);
+  }
+  calc.getRangeByIndexes(1, layout.totalComponentStart, layout.restaurantCapacity + 1, 5).setFormulas(formulas);
+
+  const idRange = `$AF$2:$AF$${layout.restaurantCapacity + 1}`;
+  const keyRange = `$${sortKeyColumn}$2:$${sortKeyColumn}$${layout.restaurantCapacity + 1}`;
+  const numericFirst = columnName(layout.numericDisplayStart);
+  const numericLast = columnName(layout.numericDisplayStart + layout.groupCapacity - 1);
+  const sortFormulas: string[][] = [];
+  const sortedIdFormulas: string[][] = [];
+  for (let rowIndex = 0; rowIndex < layout.restaurantCapacity; rowIndex += 1) {
+    const excelRow = rowIndex + 2;
+    sortFormulas.push([
+      `=IF($AF${excelRow}="","",IF($AL$13="",$${totalDisplayColumn}${excelRow},IFERROR(INDEX($${numericFirst}${excelRow}:$${numericLast}${excelRow},1,MATCH($AL$13,$J$2:$J$${layout.groupCapacity + 1},0)),"")))`
+    ]);
+    sortedIdFormulas.push([
+      `=IFERROR(INDEX(SORTBY(FILTER(${idRange},${idRange}<>""),FILTER(--(${keyRange}=""),${idRange}<>""),1,FILTER(IF(${keyRange}="",0,${keyRange}),${idRange}<>""),IF($AL$14="Highest first",-1,1),FILTER(IF(${keyRange}="","",${idRange}),${idRange}<>""),IF($AL$14="Highest first",1,-1),FILTER(${idRange},${idRange}<>""),1),ROWS($${sortedIdColumn}$2:${sortedIdColumn}${excelRow})),"")`
+    ]);
+  }
+  calc.getRangeByIndexes(1, layout.sortKeyColumn, layout.restaurantCapacity, 1).setFormulas(sortFormulas);
+  calc.getRangeByIndexes(1, layout.sortedRestaurantIdColumn, layout.restaurantCapacity, 1).setFormulas(sortedIdFormulas);
+}
+
+function selectedNumeratorExpression(layout: RuntimeLayout, blockIndex: number, excelRow: number): string {
+  const terms: string[] = [];
+  for (let group = 0; group < layout.groupCapacity; group += 1) {
+    terms.push(`IF(COUNTIF($AI$2:$AI$${layout.groupCapacity + 1},$J$${group + 2})>0,${componentCellReference(layout, blockIndex, excelRow, group)},0)`);
+  }
+  return terms.join("+") || "0";
+}
+
+function componentCellReference(layout: RuntimeLayout, blockIndex: number, excelRow: number, groupIndex: number): string {
+  return `$${columnName(layout.componentStarts[blockIndex] + groupIndex)}${excelRow}`;
+}
+
+function writeDetailFormulas(performance: ExcelScript.Worksheet, layout: RuntimeLayout): void {
+  const currentNumerator = componentTotalExpression(layout, 0);
+  const currentDenominator = componentTotalExpression(layout, 1);
+  const currentShare = componentTotalExpression(layout, 2);
+  const comparisonDenominator = componentTotalExpression(layout, 4);
+  const comparisonShare = componentTotalExpression(layout, 5);
+  const position = `MATCH('_Metric_Calc'!$AL$6,'_Metric_Calc'!$J$2:$J$${layout.groupCapacity + 1},0)`;
+  performance.getRange("B16").setFormula(`=IFERROR(IF(INDEX(${currentDenominator},1,${position})=0,"${DASH}",INDEX(${currentShare},1,${position})),"${DASH}")`);
+  performance.getRange("B17").setFormula(`=IFERROR(IF(INDEX(${comparisonDenominator},1,${position})=0,"${DASH}",INDEX(${comparisonShare},1,${position})),"${DASH}")`);
+  performance.getRange("B18").setFormula(`=IF(OR(B16="${DASH}",B17="${DASH}"),"${DASH}",(B16-B17)*100)`);
+  performance.getRange("B19").setFormula(`=IFERROR(IF(INDEX(${currentDenominator},1,${position})=0,"${DASH}",INDEX(${currentNumerator},1,${position})),"${DASH}")`);
+  performance.getRange("B16:B17").setNumberFormat("0.00%");
+  performance.getRange("B18").setNumberFormat('+0.00 "pp";-0.00 "pp";0.00 "pp"');
+  performance.getRange("B19").setNumberFormat('#,##0 "NOK"');
+}
+
+function writeDynamicMatrix(
+  performance: ExcelScript.Worksheet,
+  layout: RuntimeLayout,
+  priorLayout: RuntimeLayout
+): void {
+  const headerRow = 22;
+  const bodyStartRow = 23;
+  const matrixRows = layout.restaurantCapacity + 1;
+  const clearColumns = Math.max(layout.matrixEndColumn, priorLayout.matrixEndColumn) + 1;
+  performance.getRangeByIndexes(headerRow, 0, matrixRows + 1, clearColumns)
+    .clear(ExcelScript.ClearApplyTo.contents);
+
+  performance.getRangeByIndexes(headerRow, 0, 1, layout.matrixEndColumn + 1)
+    .setValues([["Restaurant", "Total"].concat(new Array(layout.groupCapacity).fill(""))]);
+  performance.getRangeByIndexes(0, 2, 1, layout.groupCapacity).getEntireColumn().setColumnHidden(false);
+  const headerFormulas: string[][] = [[]];
+  for (let group = 0; group < layout.groupCapacity; group += 1) {
+    const visibleColumn = columnName(group + 2);
+    headerFormulas[0].push(
+      `=IF(COLUMNS($C$23:${visibleColumn}$23)<='_Metric_Calc'!$AL$5,INDEX('_Metric_Calc'!$AH$2:$AH$${layout.groupCapacity + 1},COLUMNS($C$23:${visibleColumn}$23)),"")`
+    );
+  }
+  performance.getRangeByIndexes(headerRow, 2, 1, layout.groupCapacity).setFormulas(headerFormulas);
+
+  const labelFormulas: string[][] = [];
+  const valueFormulas: string[][] = [];
+  for (let rowIndex = 0; rowIndex < matrixRows; rowIndex += 1) {
+    const sheetRow = bodyStartRow + rowIndex + 1;
+    const ordinal = `ROWS($A$${bodyStartRow + 1}:A${sheetRow})`;
+    labelFormulas.push([
+      `=IF(OR('_Metric_Calc'!$AL$4=0,'_Metric_Calc'!$AL$5=0),"",IF(${ordinal}<='_Metric_Calc'!$AL$4,INDEX('_Metric_Calc'!$AE$2:$AE$${layout.restaurantCapacity + 1},MATCH(INDEX(${sortedRestaurantIdRangeExpression(layout)},${ordinal}),'_Metric_Calc'!$AF$2:$AF$${layout.restaurantCapacity + 1},0)),IF(${ordinal}='_Metric_Calc'!$AL$4+1,"Grand Total","")))`
+    ]);
+    const formulaRow: string[] = [matrixTotalPresentationFormula(layout, sheetRow, ordinal)];
+    for (let group = 0; group < layout.groupCapacity; group += 1) {
+      formulaRow.push(matrixPresentationFormula(layout, sheetRow, columnName(group + 2), ordinal));
+    }
+    valueFormulas.push(formulaRow);
+  }
+  performance.getRangeByIndexes(bodyStartRow, 0, matrixRows, 1).setFormulas(labelFormulas);
+  const values = performance.getRangeByIndexes(bodyStartRow, 1, matrixRows, layout.groupCapacity + 1);
+  values.setFormulas(valueFormulas);
+  values.setNumberFormat("General");
+  values.getFormat().setHorizontalAlignment(ExcelScript.HorizontalAlignment.center);
+  performance.getRangeByIndexes(bodyStartRow, 0, matrixRows, 1).getFormat()
+    .setHorizontalAlignment(ExcelScript.HorizontalAlignment.left);
+  performance.getRangeByIndexes(headerRow, 1, 1, layout.groupCapacity + 1).getFormat()
+    .setHorizontalAlignment(ExcelScript.HorizontalAlignment.center);
+
+  if (layout.groupCapacity > priorLayout.groupCapacity) {
+    const templateColumn = Math.max(2, priorLayout.matrixEndColumn);
+    const template = performance.getRangeByIndexes(headerRow, templateColumn, matrixRows + 1, 1);
+    const templateWidth = template.getEntireColumn().getFormat().getColumnWidth();
+    const added = performance.getRangeByIndexes(
+      headerRow, priorLayout.matrixEndColumn + 1, matrixRows + 1,
+      layout.matrixEndColumn - priorLayout.matrixEndColumn
+    );
+    added.getEntireColumn().getFormat().setColumnWidth(templateWidth);
+    const addedHeader = performance.getRangeByIndexes(
+      headerRow, priorLayout.matrixEndColumn + 1, 1,
+      layout.matrixEndColumn - priorLayout.matrixEndColumn
+    );
+    addedHeader.getFormat().getFill().setColor("#EEF1F5");
+    addedHeader.getFormat().getFont().setBold(true);
+    addedHeader.getFormat().getFont().setColor("#172033");
+  }
+  const formatRange = performance.getRangeByIndexes(bodyStartRow, 0, matrixRows, layout.matrixEndColumn + 1);
+  formatRange.clearAllConditionalFormats();
+  const negative = values.addConditionalFormat(ExcelScript.ConditionalFormatType.custom);
+  negative.getCustom().getRule().setFormula(`=AND(OR($G$6="PP Change",$G$6="NOK Impact"),LEFT(B${bodyStartRow + 1},1)="-")`);
+  negative.getCustom().getFormat().getFont().setColor("#A83126");
+  const grandTotal = formatRange.addConditionalFormat(ExcelScript.ConditionalFormatType.custom);
+  grandTotal.getCustom().getRule().setFormula(`=$A${bodyStartRow + 1}="Grand Total"`);
+  grandTotal.getCustom().getFormat().getFill().setColor("#EAF2FF");
+  grandTotal.getCustom().getFormat().getFont().setBold(true);
+}
+
+function matrixPresentationFormula(layout: RuntimeLayout, sheetRow: number, sheetColumn: string, ordinal: string): string {
+  const groupId = `INDEX('_Metric_Calc'!$AI$2:$AI$${layout.groupCapacity + 1},COLUMNS($C$23:${sheetColumn}$23))`;
+  const groupPosition = `MATCH(${groupId},'_Metric_Calc'!$J$2:$J$${layout.groupCapacity + 1},0)`;
+  const componentRow = sortedComponentRowExpression(layout, ordinal);
+  const numericValue = `INDEX(${numericDisplayRangeExpression(layout)},${componentRow},${groupPosition})`;
+  return matrixFacadeFormula(sheetRow, sheetColumn, numericValue);
+}
+
+function matrixTotalPresentationFormula(layout: RuntimeLayout, sheetRow: number, ordinal: string): string {
+  const componentRow = sortedComponentRowExpression(layout, ordinal);
+  return matrixFacadeFormula(sheetRow, "B", `INDEX(${totalDisplayRangeExpression(layout)},${componentRow})`);
+}
+
+function sortedComponentRowExpression(layout: RuntimeLayout, ordinal: string): string {
+  const sortedId = `INDEX(${sortedRestaurantIdRangeExpression(layout)},${ordinal})`;
+  return `IF(${ordinal}<='_Metric_Calc'!$AL$4,MATCH(${sortedId},'_Metric_Calc'!$AF$2:$AF$${layout.restaurantCapacity + 1},0),${layout.restaurantCapacity + 1})`;
+}
+
+function matrixFacadeFormula(sheetRow: number, sheetColumn: string, numericValue: string): string {
+  return `=IF(OR($A${sheetRow}="",${sheetColumn}$23=""),"",IF(NOT(ISNUMBER(${numericValue})),"${DASH}",IF($G$6="PP Change",IF(${numericValue}>0,"+","")&FIXED(${numericValue},2,TRUE)&" pp",IF(OR($G$6="Current Share",$G$6="Comparison Share"),FIXED(${numericValue}*100,2,TRUE)&"%",IF($G$6="Current Sales NOK",FIXED(${numericValue},0,FALSE)&" NOK",IF($G$6="NOK Impact",IF(${numericValue}>0,"+","")&FIXED(${numericValue},0,FALSE)&" NOK",""))))))`;
+}
+
+function numericDisplayRangeExpression(layout: RuntimeLayout): string {
+  const first = columnName(layout.numericDisplayStart);
+  const last = columnName(layout.numericDisplayStart + layout.groupCapacity - 1);
+  return `'_Metric_Calc'!$${first}$2:$${last}$${layout.restaurantCapacity + 2}`;
+}
+
+function totalDisplayRangeExpression(layout: RuntimeLayout): string {
+  const column = columnName(layout.totalDisplayColumn);
+  return `'_Metric_Calc'!$${column}$2:$${column}$${layout.restaurantCapacity + 2}`;
+}
+
+function sortedRestaurantIdRangeExpression(layout: RuntimeLayout): string {
+  const column = columnName(layout.sortedRestaurantIdColumn);
+  return `'_Metric_Calc'!$${column}$2:$${column}$${layout.restaurantCapacity + 1}`;
+}
+
+function componentTotalExpression(layout: RuntimeLayout, blockIndex: number): string {
+  const first = columnName(layout.componentStarts[blockIndex]);
+  const last = columnName(layout.componentStarts[blockIndex] + layout.groupCapacity - 1);
+  const row = layout.componentTotalRow + 1;
+  return `'_Metric_Calc'!$${first}$${row}:$${last}$${row}`;
 }
 
 function writeReportsPeriodLinks(reports: ExcelScript.Worksheet): void {
@@ -350,24 +885,46 @@ function writeReportsPeriodLinks(reports: ExcelScript.Worksheet): void {
 }
 
 function validateInstalledState(
+  workbook: ExcelScript.Workbook,
   performance: ExcelScript.Worksheet,
   reports: ExcelScript.Worksheet,
-  calc: ExcelScript.Worksheet
+  calc: ExcelScript.Worksheet,
+  groups: ReportingGroup[],
+  plannedGroups: GroupSelectionRow[],
+  layout: RuntimeLayout
 ): void {
   if (calc.getRange("AL16").getText() !== "Available" || calc.getRange("AL17").getText() !== "Valid" ||
       calc.getRange("AL18").getText() !== "Valid") {
     throw new Error(`PUL-030P-008: Installed weekly Performance is unavailable: ${calc.getRange("AL16:AL18").getTexts().join("|")}.`);
   }
-  const helperText = calc.getRange("AN1:CT18").getFormulas().map(row => row.join("|")).join("\n");
+  const helperText = calc.getRangeByIndexes(
+    0, layout.componentStarts[0], layout.restaurantCapacity + 2,
+    layout.totalDisplayColumn - layout.componentStarts[0] + 1
+  ).getFormulas().map(row => row.join("|")).join("\n");
   if (helperText.indexOf("tblWeeklyRPGCache") < 0 || helperText.indexOf("tblWeeklyScopeCache") < 0 ||
       helperText.indexOf("tblMetricRPGResults") >= 0 || helperText.indexOf("AVERAGE") >= 0) {
     throw new Error("PUL-030P-009: Component grids are not exclusively weekly-cache additive formulas.");
   }
   if (reports.getRange("B8").getFormula() !== "=Performance!B13" ||
       reports.getRange("B9").getFormula() !== "=Performance!G13" ||
-      performance.getRange("B13").getText() !== "2026 W01–W32" ||
-      performance.getRange("G13").getText() !== "2025 W01–W32") {
-    throw new Error("PUL-030P-010: Default summaries or Reports linkage differ.");
+      performance.getRange("B13").getText() !== calc.getRange("AL21").getText() ||
+      performance.getRange("G13").getText() !== calc.getRange("AL22").getText()) {
+    throw new Error("PUL-030P-010: Selected summaries or Reports linkage differ.");
+  }
+  const selection = requiredTable(workbook, "tblPerformanceRPGSelection");
+  const selectionRows = tableRows(selection);
+  if (selectionRows.length !== plannedGroups.length || groups.length !== layout.groupCapacity ||
+      number(calc.getRange("AL11").getValue()) !== groups.length) {
+    throw new Error("PUL-030P-020: Reporting Group runtime capacity differs from the active catalog.");
+  }
+  const sh = headerMap(selection);
+  const helper = calc.getRangeByIndexes(1, 8, groups.length, 2).getTexts();
+  for (let index = 0; index < groups.length; index += 1) {
+    if (text(selectionRows[index][sh.ReportingGroupID]) !== plannedGroups[index].id ||
+        text(selectionRows[index][sh.Include]) !== plannedGroups[index].include ||
+        text(helper[index][0]) !== groups[index].name || text(helper[index][1]) !== groups[index].id) {
+      throw new Error(`PUL-030P-020: Reporting Group runtime row ${index + 1} differs from ${groups[index].id}.`);
+    }
   }
 }
 
@@ -375,7 +932,8 @@ function writeWeeklyPerformanceQA(
   workbook: ExcelScript.Workbook,
   sheet: ExcelScript.Worksheet,
   live: LiveState,
-  authority: ActiveCacheAuthority
+  authority: ActiveCacheAuthority,
+  activeGroupCount: number
 ): void {
   const prior = workbook.getTable("tblWeeklyPerformanceQA");
   if (prior) prior.delete();
@@ -390,13 +948,13 @@ function writeWeeklyPerformanceQA(
     ["QA-030WP-07", "Aggregate before share", "PASS", 0, "Additive numerators and denominators are summed before Phase 2C share math."],
     ["QA-030WP-08", "All-state denominator", "PASS", 0, "Scope cache SourceSalesNOK includes every mapping/identity state."],
     ["QA-030WP-09", "Phase 2C presentation preserved", "PASS", `${live.phase2CPassCount}/16`, "Five modes, Total, Grand Total, sorting and text facade remain unchanged."],
-    ["QA-030WP-10", "Selection contracts preserved", "PASS", "Restaurant + RPG + detail", "Stable-ID selection tables are unchanged."],
+    ["QA-030WP-10", "Dynamic Reporting Group runtime", "PASS", `${activeGroupCount} active groups`, "Stable-ID selections are preserved; newly eligible groups default No."],
     ["QA-030WP-11", "Reports linkage", "PASS", "Performance B13/G13", "Reports uses the generated weekly summaries and detail result."],
     ["QA-030WP-12", "Same-period behavior", "PASS", "Allowed", "Same range produces zero PP Change and NOK Impact."],
     ["QA-030WP-13", "Different-length behavior", "PASS", "Allowed with warning", "No absolute-period blocking is introduced."],
     ["QA-030WP-14", "Invalid/incomplete behavior", "PASS", "Blocked", "No partial range is silently calculated."],
     ["QA-030WP-15", "Formula-only exploration", "PASS", 0, "Period, restaurant, RPG, display and sort changes require recalculation only."],
-    ["QA-030WP-16", "Protected rollback surfaces", "PASS", 0, "Facts, imports, mapping, legacy results and selection tables are unchanged."]
+    ["QA-030WP-16", "Protected rollback surfaces", "PASS", 0, "Facts, imports, mapping, legacy results and the fixed nine-group legacy regression remain unchanged."]
   ];
   sheet.getRange("A43:E43").setValues([["Weekly Performance Cutover QA", "", "", "", ""]]);
   sheet.getRange("A44:E44").setValues([["CheckID", "Check", "Result", "Observed", "Explanation"]]);
@@ -562,9 +1120,7 @@ function protectedFingerprint(workbook: ExcelScript.Workbook): string {
     "tblEffectiveMapping", rangeFingerprint(requiredTable(workbook, "tblEffectiveMapping").getRange()),
     "tblKPIRegistry", rangeFingerprint(requiredTable(workbook, "tblKPIRegistry").getRange()),
     "tblPerformanceRestaurantSelection",
-    rangeFingerprint(requiredTable(workbook, "tblPerformanceRestaurantSelection").getRange()),
-    "tblPerformanceRPGSelection",
-    rangeFingerprint(requiredTable(workbook, "tblPerformanceRPGSelection").getRange())
+    rangeFingerprint(requiredTable(workbook, "tblPerformanceRestaurantSelection").getRange())
   ];
   return hashStrings(parts, "P-");
 }

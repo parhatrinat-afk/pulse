@@ -330,10 +330,7 @@ function buildCandidateRows(workbook: ExcelScript.Workbook, active: ActiveSnapsh
   const identity = buildIdentityPlan(report, sourceSystemId, identityProducts,
     identityClassifications, identityRestaurants, groups, rules, effective,
     number(active.activeVersion.mappingAsOfDate));
-  const activeGroups = groups.filter(row => text(row.active) === "Yes")
-    .sort((left, right) => number(left.sortOrder) - number(right.sortOrder) ||
-      compareText(left.reportingGroupId, right.reportingGroupId));
-  if (activeGroups.length !== 9) throw new Error(`PUL-030WPR-106: Active Reporting Groups are ${activeGroups.length}; expected 9.`);
+  const activeGroups = validatedActiveReportingGroups(groups);
   const incoming = buildIncomingWeek(report, identity, activeGroups);
   const periodBase: DataRow[] = [];
   for (const row of active.periodRows) periodBase.push(cloneRow(row));
@@ -839,10 +836,15 @@ function validateParsedReport(report: ParsedReport): void {
 }
 
 function validateCompleteRows(periods: DataRow[], scopes: DataRow[], rpgs: DataRow[], groups: DataRow[]): void {
-  if (groups.length !== 9 || rpgs.length !== scopes.length * 9) throw new Error("PUL-030WPR-133: Dense RPG grain is incomplete.");
+  const activeGroups = validatedActiveReportingGroups(groups);
+  if (rpgs.length !== scopes.length * activeGroups.length) {
+    throw new Error(`PUL-030WPR-133: Dense RPG grain has ${rpgs.length} rows; expected ${scopes.length * activeGroups.length}.`);
+  }
   const periodSeen: { [key: string]: boolean } = {};
   const scopeSeen: { [key: string]: boolean } = {};
   const rpgSeen: { [key: string]: boolean } = {};
+  const activeGroupIds: { [key: string]: boolean } = {};
+  for (const group of activeGroups) activeGroupIds[keyToken(text(group.reportingGroupId))] = true;
   const mappedScope = zeroMetric(); const mappedRpg = zeroMetric();
   for (const scope of scopes) {
     const key = keyToken(`${text(scope.cacheVersion)}|${text(scope.sourcePeriodKey)}|${text(scope.restaurantId)}`);
@@ -855,7 +857,18 @@ function validateCompleteRows(periods: DataRow[], scopes: DataRow[], rpgs: DataR
   for (const rpg of rpgs) {
     const key = keyToken(`${text(rpg.cacheVersion)}|${text(rpg.sourcePeriodKey)}|${text(rpg.restaurantId)}|${text(rpg.reportingGroupId)}`);
     if (rpgSeen[key]) throw new Error("PUL-030WPR-136: Duplicate RPG grain."); rpgSeen[key] = true;
+    if (!activeGroupIds[keyToken(text(rpg.reportingGroupId))]) {
+      throw new Error(`PUL-030WPR-136: RPG grain references inactive or unknown ReportingGroupID ${text(rpg.reportingGroupId)}.`);
+    }
     addMetric(mappedRpg, { factCount: number(rpg.mappedFactCount), salesNok: number(rpg.mappedSalesNok), quantity: number(rpg.mappedQuantity) });
+  }
+  for (const scope of scopes) {
+    for (const group of activeGroups) {
+      const key = keyToken(`${text(scope.cacheVersion)}|${text(scope.sourcePeriodKey)}|${text(scope.restaurantId)}|${text(group.reportingGroupId)}`);
+      if (!rpgSeen[key]) {
+        throw new Error(`PUL-030WPR-136: ${text(scope.sourcePeriodKey)}/${text(scope.restaurantId)} is missing dense ReportingGroupID ${text(group.reportingGroupId)}.`);
+      }
+    }
   }
   if (!equalMetric(mappedScope, mappedRpg)) throw new Error("PUL-030WPR-137: Mapped scope and RPG rows differ.");
   for (const period of periods) {
@@ -866,6 +879,34 @@ function validateCompleteRows(periods: DataRow[], scopes: DataRow[], rpgs: DataR
       throw new Error(`PUL-030WPR-139: ${text(period.sourcePeriodKey)} does not reconcile.`);
     }
   }
+}
+
+function validatedActiveReportingGroups(groups: DataRow[]): DataRow[] {
+  const catalogIds: { [key: string]: boolean } = {};
+  const activeSortOrders: { [key: string]: boolean } = {};
+  const active: DataRow[] = [];
+  for (const row of groups) {
+    const reportingGroupId = text(row.reportingGroupId);
+    if (!reportingGroupId) throw new Error("PUL-030WPR-106: Reporting Group catalog contains a blank ReportingGroupID.");
+    const idKey = keyToken(reportingGroupId);
+    if (catalogIds[idKey]) throw new Error(`PUL-030WPR-106: Reporting Group catalog repeats ${reportingGroupId}.`);
+    catalogIds[idKey] = true;
+    if (text(row.active) !== "Yes") continue;
+    const sortOrder = Number(row.sortOrder);
+    if (!Number.isFinite(sortOrder)) {
+      throw new Error(`PUL-030WPR-106: Active Reporting Group ${reportingGroupId} has an invalid SortOrder.`);
+    }
+    const sortKey = keyToken(String(sortOrder));
+    if (activeSortOrders[sortKey]) {
+      throw new Error(`PUL-030WPR-106: Active Reporting Groups repeat SortOrder ${sortOrder}.`);
+    }
+    activeSortOrders[sortKey] = true;
+    active.push(row);
+  }
+  if (!active.length) throw new Error("PUL-030WPR-106: At least one active Reporting Group is required.");
+  active.sort((left, right) => number(left.sortOrder) - number(right.sortOrder) ||
+    compareText(left.reportingGroupId, right.reportingGroupId));
+  return active;
 }
 
 function fingerprintCorpus(rows: DataRow[]): string {

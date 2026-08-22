@@ -61,10 +61,10 @@ Current scripts include:
   QA before changing only the accepted version's two authority fields to
   `Active`. It does not add period selectors or cut Performance over.
 - `Build_0_3_0_Weekly_Performance.ts` — validates the exact fresh Active cache,
-  installs independent Year/From week/To week controls, and repoints only the
-  Phase 2C additive component inputs to weekly RPG/scope cache tables. Invalid
-  or incomplete ranges are blocked while the accepted Phase 2C numeric,
-  Total, Grand Total, sorting, detail and presentation layers remain intact.
+  installs independent Year/From week/To week controls, and sizes the accepted
+  Phase 2C component/presentation layers from the active Reporting Group count.
+  Stable-ID selections are preserved and newly active groups default `No`.
+  Invalid or incomplete ranges remain blocked.
 - `Build_0_3_0_Performance_Presentation_Cleanup.ts` — runs after the accepted
   weekly Performance cutover, moves the two existing native selection tables
   below Explain, balances matrix widths/alignment, and updates the obsolete

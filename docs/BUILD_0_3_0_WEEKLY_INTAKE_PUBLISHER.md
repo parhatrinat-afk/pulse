@@ -42,7 +42,7 @@ current freshness fingerprints. For a new period it:
    to the incoming week;
 4. rekeys the retained historical cache rows into a new version without
    mutating the active rows;
-5. adds the new week scope and dense nine-RPG rows;
+5. adds the new week scope and dense rows for every active Reporting Group;
 6. reconciles every period, mapping-state coverage and mapped RPG totals;
 7. derives deterministic WCV/WCC fingerprints; and
 8. returns `Candidate / Not Active` state ready for later materialization and

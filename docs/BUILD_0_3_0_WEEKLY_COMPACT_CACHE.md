@@ -37,8 +37,11 @@ Grain:
 
 `CacheVersion × SourcePeriodKey × RestaurantID × ReportingGroupID`
 
-The cache is dense across the nine active Reporting Groups for every observed
-Restaurant/week scope. Zero rows are intentional. It stores only:
+The cache is dense across the active Reporting Group catalog for every observed
+Restaurant/week scope. The accepted checkpoint has nine active groups; current
+runtime construction uses `scope rows × active group count`. Zero rows are
+intentional, including for a new active group with no mapped products. It stores
+only:
 
 - deterministic `WeeklyRPGCacheRowID`;
 - the four grain fields;

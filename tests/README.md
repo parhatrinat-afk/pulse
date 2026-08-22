@@ -83,10 +83,11 @@ input is the read-only `fixtures/build-0.3.0-weekly-identity-catalog.json`
 snapshot rather than a workbook artifact.
 
 The candidate compact weekly cache suite validates deterministic candidate
-versioning and row IDs, one denominator per Restaurant/week, dense nine-RPG
+versioning and row IDs, one denominator per Restaurant/week, dense active-RPG
 numerators, all five mapping/identity states, Test Department scope exclusion,
 current Product-hierarchy authority, stale-state rejection, complete weekly and
-range aggregation, and the frozen 84-week reconciliation checkpoint.
+range aggregation, and the frozen nine-group 84-week reconciliation checkpoint.
+Dynamic-runtime fixtures separately prove a zero-member tenth group.
 
 The Excel materialization suite validates the four explicit hidden-table
 schemas, bounded chunk geometry, inactive/idempotent staging contract,

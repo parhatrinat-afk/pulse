@@ -17,7 +17,9 @@ Build 0.3.0 begins the bounded weekly source parser foundation here.
   caller-supplied corpus plus a frozen accepted catalog snapshot. It remains
   read-only and creates no cache or workbook state.
 - `weekly-compact-cache.mjs` builds a validated candidate with one denominator
-  row per Restaurant/week and nine dense additive RPG rows per Restaurant/week.
+  row per Restaurant/week and one dense additive row per active Reporting Group
+  per Restaurant/week. The accepted checkpoint has nine active groups; current
+  construction is count-driven.
   It reuses the accepted identity preflight, current hierarchy resolver, and
   shared Performance restaurant-scope fingerprint.
 - `audit-weekly-compact-cache.mjs` runs that candidate against one exact corpus

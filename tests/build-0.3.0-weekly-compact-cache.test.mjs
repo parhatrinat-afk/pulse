@@ -49,6 +49,47 @@ test("candidate cache uses the approved compact grains and deterministic row IDs
   assert.equal(cache.validation.status, "PASS");
 });
 
+test("ten active Reporting Groups produce a dense zero-member tenth group without changing source totals", () => {
+  const catalog = fixtureCatalog();
+  catalog.reportingGroups.push({
+    reportingGroupId: "RPG-0010", reportingGroupName: "Kids Menu",
+    active: "Yes", sortOrder: 100,
+  });
+  const cache = buildCache([report(2026, 1, [
+    sourceRow("Known Restaurant", "Main A", "Sub A", "Known Product", 2, 200),
+  ])], catalog);
+  const tenth = cache.weeklyRpgCacheRows.find(row => row.reportingGroupId === "RPG-0010");
+
+  assert.equal(cache.scopeCacheRows.length, 1);
+  assert.equal(cache.weeklyRpgCacheRows.length, 10);
+  assert.deepEqual({
+    factCount: cache.scopeCacheRows[0].sourceFactCount,
+    salesNok: cache.scopeCacheRows[0].sourceSalesNok,
+    quantity: cache.scopeCacheRows[0].sourceQuantity,
+  }, { factCount: 1, salesNok: 200, quantity: 2 });
+  assert.deepEqual({
+    factCount: tenth.mappedFactCount,
+    salesNok: tenth.mappedSalesNok,
+    quantity: tenth.mappedQuantity,
+  }, { factCount: 0, salesNok: 0, quantity: 0 });
+  assert.equal(cache.validation.status, "PASS");
+});
+
+test("dynamic cache rejects empty active catalogs, duplicate IDs, and duplicate active SortOrder", () => {
+  const reportRows = [report(2026, 1, [
+    sourceRow("Known Restaurant", "Main A", "Sub A", "Known Product", 1, 100),
+  ])];
+  const empty = fixtureCatalog();
+  empty.reportingGroups = empty.reportingGroups.map(row => ({ ...row, active: "No" }));
+  assert.throws(() => buildCache(reportRows, empty), /at least one active Reporting Group/i);
+  const duplicateId = fixtureCatalog();
+  duplicateId.reportingGroups.push({ ...duplicateId.reportingGroups[0] });
+  assert.throws(() => buildCache(reportRows, duplicateId), /ReportingGroupID RPG-0001 is duplicated|repeats ReportingGroupID/);
+  const duplicateSort = fixtureCatalog();
+  duplicateSort.reportingGroups[1].sortOrder = duplicateSort.reportingGroups[0].sortOrder;
+  assert.throws(() => buildCache(reportRows, duplicateSort), /repeat SortOrder/);
+});
+
 test("scope denominator exists once per restaurant/week and is absent from RPG rows", () => {
   const cache = buildCache([report(2026, 1, [
     sourceRow("Known Restaurant", "Main A", "Sub A", "Known Product", 2, 200),
