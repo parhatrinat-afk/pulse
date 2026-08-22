@@ -115,6 +115,12 @@ accepted Add-ons fixtures, active-cache freshness, additive aggregation before
 shares, the four bounded component-block replacements, Reports linkage and
 preservation of the Phase 2C numeric/presentation architecture.
 
+The Overview live-facade suite proves that selected-scope management metrics
+and Top/Bottom 3 outputs remain upstream Performance authority, while Overview
+contains no raw-fact/cache reads, aggregation, ranking, period engine, selector,
+or parallel business-result table. It also locks stale-state suppression,
+dynamic Reporting Group behavior, operational status sources, and navigation.
+
 The weekly intake publisher/adapter suites validate dynamic Active authority,
 all five intake outcomes, deterministic inactive Candidate construction,
 idempotent hidden-ledger behavior, bounded Candidate payloads, typed

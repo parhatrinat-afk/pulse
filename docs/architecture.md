@@ -14,9 +14,10 @@ Pulse separates raw/source data, standardized facts, business classification, de
 6. **Reporting Groups** — stable business-owned semantic classifications resolved by inheritance.
 7. **Metric engine** — deterministic calculations from published facts after mapping resolution.
 8. **KPI Registry** — defines which metrics are active and how they may be presented.
-9. **Performance** — interactive exploration of trusted KPI results.
-10. **Reports** — meeting-ready consumption of the same metric results.
-11. **Human context** — acknowledgement/explanation without rewriting the underlying facts.
+9. **Performance** — interactive exploration of trusted KPI results and the authority for selected-scope presentation outputs.
+10. **Overview** — management landing-page facade over Performance plus Imports/Mapping operational status; it does not calculate metrics or rankings.
+11. **Reports** — meeting-ready consumption of the same metric results.
+12. **Human context** — acknowledgement/explanation without rewriting the underlying facts.
 
 ## Phase 1 mapping implementation
 

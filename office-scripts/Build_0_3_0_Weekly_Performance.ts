@@ -506,6 +506,7 @@ function writeWeeklyRuntimeCalc(
   writeShareBlock(calc, layout, 5, 3, 4);
   writeNumericDisplayBlock(calc, layout);
   writeTotalAndSortHelpers(calc, layout);
+  writeManagementOverviewAuthority(calc, layout);
 
   calc.getRangeByIndexes(1, layout.componentStarts[0], layout.restaurantCapacity + 1, layout.groupCapacity)
     .setNumberFormat('#,##0.00 "NOK"');
@@ -728,6 +729,133 @@ function writeTotalAndSortHelpers(calc: ExcelScript.Worksheet, layout: RuntimeLa
   }
   calc.getRangeByIndexes(1, layout.sortKeyColumn, layout.restaurantCapacity, 1).setFormulas(sortFormulas);
   calc.getRangeByIndexes(1, layout.sortedRestaurantIdColumn, layout.restaurantCapacity, 1).setFormulas(sortedIdFormulas);
+}
+
+/**
+ * Stable upstream outputs for management presentation surfaces.
+ *
+ * These formulas remain part of the accepted Performance authority: they use
+ * the same selected-scope additive components, display metric, freshness gate,
+ * and full-precision ranking semantics as Performance. Overview may project
+ * these cells, but must not reproduce their calculations.
+ */
+function writeManagementOverviewAuthority(calc: ExcelScript.Worksheet, layout: RuntimeLayout): void {
+  const totalRow = layout.componentTotalRow + 1;
+  const currentNumerator = `$${columnName(layout.totalComponentStart)}$${totalRow}`;
+  const currentDenominator = `$${columnName(layout.totalComponentStart + 1)}$${totalRow}`;
+  const comparisonNumerator = `$${columnName(layout.totalComponentStart + 2)}$${totalRow}`;
+  const comparisonDenominator = `$${columnName(layout.totalComponentStart + 3)}$${totalRow}`;
+
+  calc.getRange("AK32:AL45").setValues([
+    ["Management Performance availability", ""],
+    ["Current period", ""],
+    ["Comparison period", ""],
+    ["Period status", ""],
+    ["Latest published", ""],
+    ["Selection recency", ""],
+    ["Display metric", ""],
+    ["Restaurant scope", ""],
+    ["Reporting Group scope", ""],
+    ["Total Sales", ""],
+    ["Selected Category Sales", ""],
+    ["Sales Share", ""],
+    ["PP Change", ""],
+    ["NOK Impact", ""]
+  ]);
+  calc.getRange("AL32").setFormula('=IF(AND($AL$16="Available",$AL$17="Valid",$AL$18="Valid",$AL$4>0,$AL$5>0),"Available","Unavailable")');
+  calc.getRange("AL33").setFormula("=$AL$21");
+  calc.getRange("AL34").setFormula("=$AL$22");
+  calc.getRange("AL35").setFormula("=$AL$23");
+  calc.getRange("AL36").setFormula(latestPublishedPeriodFormula());
+  calc.getRange("AL37").setFormula(selectionRecencyFormula());
+  calc.getRange("AL38").setFormula("=$AL$7");
+  calc.getRange("AL39").setFormula('=IF($AL$4=$AL$10,"All "&$AL$10&" restaurants",$AL$4&" of "&$AL$10&" restaurants")');
+  calc.getRange("AL40").setFormula('=IF($AL$5=$AL$11,"All "&$AL$11&" Reporting Groups",$AL$5&" of "&$AL$11&" Reporting Groups")');
+  calc.getRange("AL41").setFormula(`=IF($AL$32="Available",${currentDenominator},"")`);
+  calc.getRange("AL42").setFormula(`=IF($AL$32="Available",${currentNumerator},"")`);
+  calc.getRange("AL43").setFormula(`=IF(OR($AL$32<>"Available",${currentDenominator}=0),"",${currentNumerator}/${currentDenominator})`);
+  calc.getRange("AL44").setFormula(`=IF(OR($AL$32<>"Available",${currentDenominator}=0,${comparisonDenominator}=0),"",((${currentNumerator}/${currentDenominator})-(${comparisonNumerator}/${comparisonDenominator}))*100)`);
+  calc.getRange("AL45").setFormula(`=IF(OR($AL$32<>"Available",${currentDenominator}=0,${comparisonDenominator}=0),"",${currentNumerator}-((${comparisonNumerator}/${comparisonDenominator})*${currentDenominator}))`);
+  calc.getRange("AL41:AL42").setNumberFormat('#,##0.00 "NOK"');
+  calc.getRange("AL43").setNumberFormat("0.00%");
+  calc.getRange("AL44").setNumberFormat('+0.00 "pp";-0.00 "pp";0.00 "pp"');
+  calc.getRange("AL45").setNumberFormat('+#,##0.00 "NOK";-#,##0.00 "NOK";0.00 "NOK"');
+
+  writeGroupManagementRankings(calc, layout);
+  writeRestaurantManagementRankings(calc, layout);
+}
+
+function writeGroupManagementRankings(calc: ExcelScript.Worksheet, layout: RuntimeLayout): void {
+  calc.getRange("AN32:AQ38").setValues([
+    ["Position", "ReportingGroupID", "Reporting Group", "Numeric value"],
+    ["Top 1", "", "", ""], ["Top 2", "", "", ""], ["Top 3", "", "", ""],
+    ["Bottom 1", "", "", ""], ["Bottom 2", "", "", ""], ["Bottom 3", "", "", ""]
+  ]);
+  const catalogEnd = layout.groupCapacity + 1;
+  const valueFirst = columnName(layout.numericDisplayStart);
+  const valueLast = columnName(layout.numericDisplayStart + layout.groupCapacity - 1);
+  const valueRange = `$${valueFirst}$${layout.componentTotalRow + 1}:$${valueLast}$${layout.componentTotalRow + 1}`;
+  const idRange = `$J$2:$J$${catalogEnd}`;
+  const selectedRange = `$AI$2:$AI$${catalogEnd}`;
+  const nameRange = `$I$2:$I$${catalogEnd}`;
+  const ids: string[][] = [];
+  for (let index = 0; index < 6; index += 1) {
+    const rank = index < 3 ? index + 1 : index - 2;
+    const descending = index < 3;
+    ids.push([groupRankingIdFormula(idRange, selectedRange, valueRange, rank, descending)]);
+  }
+  calc.getRange("AO33:AO38").setFormulas(ids);
+  calc.getRange("AP33").setFormula(`=IF($AO33="","",XLOOKUP($AO33,${idRange},${nameRange},""))`);
+  calc.getRange("AP33:AP38").fillDown();
+  calc.getRange("AQ33").setFormula(`=IF($AO33="","",INDEX(${valueRange},1,MATCH($AO33,${idRange},0)))`);
+  calc.getRange("AQ33:AQ38").fillDown();
+}
+
+function writeRestaurantManagementRankings(calc: ExcelScript.Worksheet, layout: RuntimeLayout): void {
+  calc.getRange("AS32:AV38").setValues([
+    ["Position", "RestaurantID", "Restaurant", "Numeric value"],
+    ["Top 1", "", "", ""], ["Top 2", "", "", ""], ["Top 3", "", "", ""],
+    ["Bottom 1", "", "", ""], ["Bottom 2", "", "", ""], ["Bottom 3", "", "", ""]
+  ]);
+  const idRange = `$AF$2:$AF$${layout.restaurantCapacity + 1}`;
+  const nameRange = `$AE$2:$AE$${layout.restaurantCapacity + 1}`;
+  const valueColumn = columnName(layout.totalDisplayColumn);
+  const valueRange = `$${valueColumn}$2:$${valueColumn}$${layout.restaurantCapacity + 1}`;
+  const ids: string[][] = [];
+  for (let index = 0; index < 6; index += 1) {
+    const rank = index < 3 ? index + 1 : index - 2;
+    const descending = index < 3;
+    ids.push([restaurantRankingIdFormula(idRange, valueRange, rank, descending)]);
+  }
+  calc.getRange("AT33:AT38").setFormulas(ids);
+  calc.getRange("AU33").setFormula(`=IF($AT33="","",XLOOKUP($AT33,${idRange},${nameRange},""))`);
+  calc.getRange("AU33:AU38").fillDown();
+  calc.getRange("AV33").setFormula(`=IF($AT33="","",INDEX(${valueRange},MATCH($AT33,${idRange},0)))`);
+  calc.getRange("AV33:AV38").fillDown();
+}
+
+function groupRankingIdFormula(
+  idRange: string, selectedRange: string, valueRange: string, rank: number, descending: boolean
+): string {
+  const valueDirection = descending ? -1 : 1;
+  const idDirection = descending ? 1 : -1;
+  return `=LET(ids,FILTER(${idRange},COUNTIF(${selectedRange},${idRange})>0),vals,FILTER(TRANSPOSE(${valueRange}),COUNTIF(${selectedRange},${idRange})>0),ordered,SORTBY(ids,--(vals=""),1,IF(vals="",0,vals),${valueDirection},ids,${idDirection}),IF(OR($AL$32<>"Available",${rank}>MIN(3,$AL$5)),"",IFERROR(INDEX(ordered,${rank}),"")))`;
+}
+
+function restaurantRankingIdFormula(
+  idRange: string, valueRange: string, rank: number, descending: boolean
+): string {
+  const valueDirection = descending ? -1 : 1;
+  const idDirection = descending ? 1 : -1;
+  return `=LET(ids,FILTER(${idRange},${idRange}<>""),vals,FILTER(${valueRange},${idRange}<>""),ordered,SORTBY(ids,--(vals=""),1,IF(vals="",0,vals),${valueDirection},ids,${idDirection}),IF(OR($AL$32<>"Available",${rank}>MIN(3,$AL$4)),"",IFERROR(INDEX(ordered,${rank}),"")))`;
+}
+
+function latestPublishedPeriodFormula(): string {
+  return '=IF($AL$16<>"Available","",LET(y,MAX(FILTER(tblWeeklyPeriodManifest[ISOYear],tblWeeklyPeriodManifest[CacheVersion]=$AL$24)),w,MAX(FILTER(tblWeeklyPeriodManifest[ISOWeek],(tblWeeklyPeriodManifest[CacheVersion]=$AL$24)*(tblWeeklyPeriodManifest[ISOYear]=y))),y&" W"&TEXT(w,"00")))';
+}
+
+function selectionRecencyFormula(): string {
+  return '=IF($AL$16<>"Available","",LET(y,MAX(FILTER(tblWeeklyPeriodManifest[ISOYear],tblWeeklyPeriodManifest[CacheVersion]=$AL$24)),w,MAX(FILTER(tblWeeklyPeriodManifest[ISOWeek],(tblWeeklyPeriodManifest[CacheVersion]=$AL$24)*(tblWeeklyPeriodManifest[ISOYear]=y))),IF(OR(Performance!$B$10<y,AND(Performance!$B$10=y,VALUE(RIGHT(Performance!$B$12,2))<w)),"Newer week available","")))';
 }
 
 function selectedNumeratorExpression(layout: RuntimeLayout, blockIndex: number, excelRow: number): string {

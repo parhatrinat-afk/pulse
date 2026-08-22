@@ -70,7 +70,13 @@ Current scripts include:
   installs independent Year/From week/To week controls, and sizes the accepted
   Phase 2C component/presentation layers from the active Reporting Group count.
   Stable-ID selections are preserved and newly active groups default `No`.
-  Invalid or incomplete ranges remain blocked.
+  Invalid or incomplete ranges remain blocked. Its stable management outputs
+  expose selected-scope metrics and full-precision Top/Bottom 3 rankings for
+  downstream presentation facades without duplicating the metric engine.
+- `Build_0_3_0_Overview.ts` — replaces the obsolete Overview shell with the
+  management landing-page facade. It projects only accepted Performance,
+  Imports, and Mapping outputs; it does not read facts/cache rows, aggregate,
+  rank, or recreate period/freshness logic.
 - `Build_0_3_0_Performance_Presentation_Cleanup.ts` — runs after the accepted
   weekly Performance cutover, moves the two existing native selection tables
   below Explain, balances matrix widths/alignment, and updates the obsolete
